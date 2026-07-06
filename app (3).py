@@ -4,6 +4,7 @@ import numpy as np
 import joblib
 import json
 import os
+import requests
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
@@ -11,7 +12,7 @@ from io import StringIO
 
 # ─── Cấu hình trang ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="🪐 AstroMine-X ",
+    page_title="🪐 AstroMine-X Pro",
     page_icon="🌌",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -24,14 +25,12 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
-    /* Nền vũ trụ */
     .stApp {
         background: #0a0e1a;
         background-image: radial-gradient(ellipse at 20% 50%, rgba(72,0,255,0.08) 0%, transparent 50%),
                           radial-gradient(ellipse at 80% 50%, rgba(0,200,255,0.05) 0%, transparent 50%);
     }
     
-    /* Tiêu đề chính - hiệu ứng ánh sáng */
     .main-header {
         font-family: 'Orbitron', sans-serif;
         font-size: 3.8rem;
@@ -61,7 +60,6 @@ st.markdown("""
         padding-bottom: 1.5rem;
     }
     
-    /* Card hiện đại */
     .card {
         background: rgba(255,255,255,0.03);
         backdrop-filter: blur(16px);
@@ -90,7 +88,6 @@ st.markdown("""
     }
     .card-title .icon { font-size: 1.6rem; }
     
-    /* Sidebar tinh tế */
     .css-1d391kg, .css-12oz5g7 {
         background: rgba(10,14,26,0.9) !important;
         backdrop-filter: blur(20px);
@@ -112,7 +109,6 @@ st.markdown("""
         line-height: 1.7;
     }
     
-    /* Buttons - hiệu ứng neon */
     .stButton button {
         background: linear-gradient(135deg, #00d4ff 0%, #7b2ffc 100%) !important;
         color: white !important;
@@ -131,7 +127,6 @@ st.markdown("""
     }
     .stButton button:active { transform: scale(0.96) !important; }
     
-    /* Inputs - glass */
     .stNumberInput input, .stTextArea textarea, .stFileUploader > div {
         background: rgba(255,255,255,0.04) !important;
         border: 1px solid rgba(255,255,255,0.08) !important;
@@ -146,7 +141,6 @@ st.markdown("""
         box-shadow: 0 0 0 4px rgba(0,212,255,0.15) !important;
     }
     
-    /* Dataframe - dark mode đẹp */
     .dataframe {
         background: transparent !important;
         color: #e6f1ff !important;
@@ -168,7 +162,6 @@ st.markdown("""
         background: rgba(0,212,255,0.04) !important;
     }
     
-    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;
         background: transparent;
@@ -188,7 +181,6 @@ st.markdown("""
         border-bottom: 2px solid #64ffda;
     }
     
-    /* Alert */
     .stAlert {
         border-radius: 16px !important;
         background: rgba(255,255,255,0.03) !important;
@@ -197,7 +189,6 @@ st.markdown("""
     }
     .stAlert .st-emotion-cache-1wmy9hl { color: #e6f1ff !important; }
     
-    /* Footer */
     .footer {
         margin-top: 4rem;
         padding: 2rem 0 1rem;
@@ -210,25 +201,9 @@ st.markdown("""
     }
     .footer span { color: #64ffda; }
     
-    /* Responsive */
     @media (max-width: 768px) {
         .main-header { font-size: 2.4rem; }
         .card { padding: 1.2rem; }
-    }
-    
-    /* Linh Bảo component sẽ được style trong iframe, nhưng ta đảm bảo nó luôn nổi bật */
-    .linhbao-iframe {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 99999;
-        pointer-events: none; /* để click xuyên qua, nhưng component bên trong có pointer-events: auto */
-    }
-    .linhbao-iframe iframe {
-        pointer-events: auto;
-        border: none;
-        width: 180px;
-        height: 220px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -249,7 +224,7 @@ LINHBAO_SAYINGS = [
     "Hãy luôn mơ ước, tiểu thư! 🌌"
 ]
 
-# ─── Hàm tạo Linh Bảo (dùng iframe để đảm bảo JS chạy) ────
+# ─── Hàm tạo Linh Bảo ────────────────────────────────────────
 def show_linhbao():
     sayings_json = json.dumps(LINHBAO_SAYINGS)
     html = f"""
@@ -341,7 +316,6 @@ def show_linhbao():
             bubble.textContent = 'Tiểu thư, em đây! 🌟';
         }}, 2000);
 
-        // Hiệu ứng hover
         wrapper.addEventListener('mouseenter', () => {{
             if (!bubble.textContent.includes('Click')) {{
                 bubble.textContent = '👆 Click để nói chuyện!';
@@ -358,7 +332,7 @@ def show_linhbao():
     """
     st.components.v1.html(html, height=220, scrolling=False)
 
-# ─── Hàm lưu bảng xếp hạng vào file JSON ──────────────────
+# ─── Hàm lưu bảng xếp hạng ──────────────────────────────────
 RANKING_FILE = "rankings.json"
 
 def load_rankings():
@@ -371,7 +345,7 @@ def save_rankings(rankings):
     with open(RANKING_FILE, 'w', encoding='utf-8') as f:
         json.dump(rankings, f, indent=2, ensure_ascii=False)
 
-# ─── Khởi tạo session_state ──────────────────────────────────
+# ─── Khởi tạo session ────────────────────────────────────────
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ""
@@ -387,7 +361,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    # Phần đăng nhập
     st.markdown('<div class="sidebar-title">🔐 Tài khoản</div>', unsafe_allow_html=True)
     if not st.session_state.logged_in:
         username = st.text_input("Tên", placeholder="Nhập tên của bạn", key="login_name")
@@ -464,11 +437,16 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 
 # ─── Hàm phân tích chung ─────────────────────────────────────
 def analyze_data(df, show_chart=True, update_score=True):
+    # Chuyển tên cột nếu cần (cho dữ liệu NASA)
+    if 'pl_bmassj' in df.columns and 'pl_bmasse' not in df.columns:
+        df = df.rename(columns={'pl_bmassj': 'pl_bmasse'})
+    
     feature_cols = ['pl_orbper', 'pl_radj', 'pl_bmasse', 'pl_orbincl', 'st_teff', 'st_logg']
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
         st.error(f"❌ Thiếu cột: {missing}")
         return None
+    
     X = df[feature_cols].copy()
     X = X.fillna(X.mean())
     X_scaled = scaler.transform(X)
@@ -477,14 +455,11 @@ def analyze_data(df, show_chart=True, update_score=True):
     df_result['Confidence'] = np.round(proba, 3)
     df_result['Prediction'] = (proba > 0.5).astype(int)
     
-    # Đếm số hành tinh tiềm năng
     n_planets = int((proba > 0.5).sum())
     
-    # Hiển thị kết quả
     st.subheader(f"📊 Kết quả – {len(df_result)} ứng viên, {n_planets} hành tinh tiềm năng")
     st.dataframe(df_result[['Confidence', 'Prediction']], use_container_width=True)
     
-    # Biểu đồ tương tác
     if show_chart:
         fig = px.histogram(
             df_result, x='Confidence', nbins=30,
@@ -504,7 +479,6 @@ def analyze_data(df, show_chart=True, update_score=True):
         fig.update_yaxes(gridcolor='rgba(255,255,255,0.05)')
         st.plotly_chart(fig, use_container_width=True)
     
-    # Cập nhật điểm cho bảng xếp hạng
     if update_score and st.session_state.logged_in:
         current_score = st.session_state.rankings.get(st.session_state.username, 0)
         if n_planets > current_score:
@@ -561,7 +535,7 @@ with tab2:
             analyze_data(df)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── TAB 3: Kết nối NASA ─────────────────────────────────────
+# ─── TAB 3: Kết nối NASA (đã sửa) ───────────────────────────
 with tab3:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title"><span class="icon">🌐</span> Tải dữ liệu mới từ NASA</div>', unsafe_allow_html=True)
@@ -571,16 +545,43 @@ with tab3:
     </div>
     """, unsafe_allow_html=True)
     
-    if st.button("📥 Tải dữ liệu NASA", key="btn_nasa"):
-        with st.spinner("Đang tải từ NASA..."):
-            try:
-                url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+pl_orbper,pl_radj,pl_bmasse,pl_orbincl,st_teff,st_logg+from+ps+where+pl_discmethod+like+'Transit'&format=csv"
-                df_nasa = pd.read_csv(url)
-                st.session_state.nasa_data = df_nasa
-                st.success(f"✅ Đã tải {len(df_nasa)} ứng viên mới!")
-                st.dataframe(df_nasa.head(), use_container_width=True)
-            except Exception as e:
-                st.error(f"❌ Lỗi tải: {e}")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        if st.button("📥 Tải dữ liệu NASA", key="btn_nasa"):
+            with st.spinner("Đang tải từ NASA... (có thể mất 5-10 giây)"):
+                try:
+                    url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
+                    params = {
+                        "query": "SELECT pl_orbper, pl_radj, pl_bmassj, pl_orbincl, st_teff, st_logg FROM ps WHERE pl_discmethod LIKE 'Transit'",
+                        "format": "csv"
+                    }
+                    response = requests.get(url, params=params, timeout=30)
+                    if response.status_code == 200:
+                        df_nasa = pd.read_csv(StringIO(response.text))
+                        st.session_state.nasa_data = df_nasa
+                        st.success(f"✅ Đã tải {len(df_nasa)} ứng viên mới!")
+                        st.dataframe(df_nasa.head(), use_container_width=True)
+                    else:
+                        st.error(f"❌ Lỗi từ NASA: HTTP {response.status_code} – {response.text[:200]}")
+                        st.info("💡 Thử tải dữ liệu mẫu thay thế bên dưới.")
+                except Exception as e:
+                    st.error(f"❌ Lỗi kết nối: {e}")
+                    st.info("💡 Vui lòng kiểm tra kết nối internet hoặc thử lại sau.")
+    
+    with col2:
+        if st.button("📦 Dữ liệu mẫu", key="btn_sample_nasa"):
+            sample_data = """pl_orbper,pl_radj,pl_bmasse,pl_orbincl,st_teff,st_logg
+1.17,1.187,2.36,89.9,5613.0,4.200
+3.23,1.169,1.89,88.93,5647.0,4.236
+5.47,0.987,0.56,89.95,5626.0,4.100
+0.82,0.456,0.12,88.50,5780.0,4.500
+2.15,0.789,0.45,87.50,5500.0,4.100
+4.12,1.234,0.89,86.50,4900.0,3.900
+6.78,0.567,0.23,90.00,5900.0,4.300"""
+            df_sample = pd.read_csv(StringIO(sample_data))
+            st.session_state.nasa_data = df_sample
+            st.success("✅ Đã tải dữ liệu mẫu (7 ứng viên)!")
+            st.dataframe(df_sample.head(), use_container_width=True)
     
     if st.session_state.nasa_data is not None:
         if st.button("🔍 Phân tích dữ liệu NASA", key="btn_analyze_nasa"):
@@ -615,13 +616,12 @@ with tab4:
         else:
             st.warning(f"❌ **KHÔNG CÓ HÀNH TINH.** Độ tin cậy: {proba*100:.2f}%")
         
-        # Hiển thị thanh đo độ tin cậy
         fig = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = proba*100,
-            title = {'text': "Độ tin cậy (%)", 'font': {'color': '#a8b2d1'}},
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            gauge = {
+            mode="gauge+number",
+            value=proba*100,
+            title={'text': "Độ tin cậy (%)", 'font': {'color': '#a8b2d1'}},
+            domain={'x': [0, 1], 'y': [0, 1]},
+            gauge={
                 'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#a8b2d1"},
                 'bar': {'color': "#7b2ffc" if proba>0.5 else "#ff6fd8"},
                 'steps': [
@@ -657,14 +657,12 @@ with tab5:
         rank_df.index = rank_df.index + 1
         rank_df.index.name = 'Hạng'
         
-        # Đánh dấu người dùng hiện tại
         if st.session_state.logged_in:
             current = st.session_state.username
             rank_df[''] = rank_df['Người dùng'].apply(lambda x: '⭐' if x == current else '')
         
         st.dataframe(rank_df, use_container_width=True)
         
-        # Biểu đồ cột top 10
         top10 = sorted_rank[:10]
         if top10:
             fig = px.bar(
