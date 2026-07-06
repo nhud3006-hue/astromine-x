@@ -2,379 +2,698 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import matplotlib.pyplot as plt
 import json
+import os
+from datetime import datetime
+import plotly.express as px
+import plotly.graph_objects as go
+from io import StringIO
 
-# ─── Cấu hình trang ────────────────────────────────────────────────
+# ─── Cấu hình trang ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="AstroMine-X | Exoplanet AI",
-    page_icon="🪐",
-    layout="wide"
+    page_title="🪐 AstroMine-X Pro",
+    page_icon="🌌",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# ─── CSS chung (giữ nguyên phần trước) ───────────────────────────
+# ─── CSS cao cấp (tối giản - sang trọng) ──────────────────────
 st.markdown("""
 <style>
-    /* Toàn bộ CSS như cũ, giữ nguyên */
+    /* Reset & fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
-    html, body, .stApp {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: #0B0E17;
-        color: #E8EDF5;
+    
+    /* Nền vũ trụ */
+    .stApp {
+        background: #0a0e1a;
+        background-image: radial-gradient(ellipse at 20% 50%, rgba(72,0,255,0.08) 0%, transparent 50%),
+                          radial-gradient(ellipse at 80% 50%, rgba(0,200,255,0.05) 0%, transparent 50%);
     }
-    .main-container { padding: 2rem 3rem; max-width: 1400px; margin: 0 auto; }
-    .app-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-bottom: 1.5rem;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
-        margin-bottom: 2rem;
-    }
-    .app-title {
-        font-size: 2.8rem;
-        font-weight: 800;
-        background: linear-gradient(135deg, #60A5FA, #A78BFA);
+    
+    /* Tiêu đề chính - hiệu ứng ánh sáng */
+    .main-header {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 3.8rem;
+        font-weight: 900;
+        text-align: center;
+        background: linear-gradient(135deg, #00d4ff 0%, #7b2ffc 50%, #ff6fd8 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        letter-spacing: -0.02em;
+        text-shadow: 0 0 40px rgba(0,212,255,0.3);
+        letter-spacing: 0.05em;
+        padding: 1.5rem 0 0.5rem;
+        animation: glowPulse 3s ease-in-out infinite;
     }
-    .app-subtitle { font-size: 1rem; font-weight: 300; color: #94A3B8; margin-top: 0.25rem; }
-    .app-badge {
-        background: rgba(96, 165, 250, 0.15);
-        padding: 0.4rem 1.2rem;
-        border-radius: 100px;
-        font-size: 0.85rem;
-        border: 1px solid rgba(96, 165, 250, 0.25);
-        color: #93C5FD;
+    @keyframes glowPulse {
+        0%, 100% { text-shadow: 0 0 30px rgba(0,212,255,0.3); }
+        50% { text-shadow: 0 0 60px rgba(123,47,252,0.5); }
     }
+    .sub-header {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.1rem;
+        font-weight: 300;
+        color: #8892b0;
+        text-align: center;
+        letter-spacing: 0.15em;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        padding-bottom: 1.5rem;
+    }
+    
+    /* Card hiện đại */
     .card {
         background: rgba(255,255,255,0.03);
-        backdrop-filter: blur(12px);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
         border-radius: 24px;
         padding: 1.8rem 2rem;
         border: 1px solid rgba(255,255,255,0.06);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-        margin-bottom: 2rem;
-        transition: all 0.2s ease;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        margin-bottom: 1.8rem;
     }
-    .card:hover { border-color: rgba(255,255,255,0.12); box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
-    .card-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1.2rem; color: #E8EDF5; display: flex; align-items: center; gap: 0.6rem; }
-    .card-title .icon { font-size: 1.4rem; }
-    .css-1d391kg, .css-12oz5g7 { background: #0F1320 !important; }
-    .sidebar-content { padding: 1.5rem 0.5rem; }
-    .sidebar-title { font-size: 1.1rem; font-weight: 600; color: #E8EDF5; margin-bottom: 1rem; }
-    .sidebar-text { font-size: 0.9rem; color: #94A3B8; line-height: 1.6; }
-    .sidebar-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 1.5rem 0; }
+    .card:hover {
+        border-color: rgba(0,212,255,0.2);
+        box-shadow: 0 12px 56px rgba(0,0,0,0.8);
+        transform: translateY(-2px);
+    }
+    .card-title {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #e6f1ff;
+        margin-bottom: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+    }
+    .card-title .icon { font-size: 1.6rem; }
+    
+    /* Sidebar tinh tế */
+    .css-1d391kg, .css-12oz5g7 {
+        background: rgba(10,14,26,0.9) !important;
+        backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(255,255,255,0.05) !important;
+    }
+    .sidebar-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #64ffda;
+        letter-spacing: 0.1em;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+    }
+    .sidebar-text {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.9rem;
+        color: #a8b2d1;
+        line-height: 1.7;
+    }
+    
+    /* Buttons - hiệu ứng neon */
     .stButton button {
-        background: linear-gradient(135deg, #3B82F6, #8B5CF6) !important;
+        background: linear-gradient(135deg, #00d4ff 0%, #7b2ffc 100%) !important;
         color: white !important;
+        font-family: 'Inter', sans-serif !important;
         font-weight: 600 !important;
         border: none !important;
-        border-radius: 12px !important;
-        padding: 0.6rem 1.8rem !important;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+        border-radius: 14px !important;
+        padding: 0.7rem 2rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 20px rgba(0,212,255,0.3) !important;
+        letter-spacing: 0.02em;
     }
-    .stButton button:hover { transform: translateY(-2px) !important; box-shadow: 0 8px 28px rgba(59, 130, 246, 0.4) !important; }
+    .stButton button:hover {
+        transform: scale(1.04) translateY(-3px) !important;
+        box-shadow: 0 8px 40px rgba(0,212,255,0.5) !important;
+    }
     .stButton button:active { transform: scale(0.96) !important; }
-    .dataframe { background: transparent !important; color: #E8EDF5 !important; border-collapse: collapse !important; }
-    .dataframe th { background: rgba(255,255,255,0.05) !important; color: #93C5FD !important; font-weight: 600 !important; padding: 0.8rem !important; border-bottom: 2px solid rgba(255,255,255,0.08) !important; }
-    .dataframe td { padding: 0.8rem !important; border-bottom: 1px solid rgba(255,255,255,0.04) !important; }
-    .dataframe tr:hover { background: rgba(255,255,255,0.03) !important; }
-    .stTabs [data-baseweb="tab-list"] { gap: 1.5rem; background: transparent; border-bottom: 2px solid rgba(255,255,255,0.06); }
-    .stTabs [data-baseweb="tab"] { font-weight: 500; color: #94A3B8; padding: 0.6rem 0; font-size: 1rem; border-bottom: 2px solid transparent; transition: all 0.2s; }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] { color: #60A5FA; border-bottom: 2px solid #60A5FA; }
-    .stNumberInput input, .stFileUploader > div {
+    
+    /* Inputs - glass */
+    .stNumberInput input, .stTextArea textarea, .stFileUploader > div {
         background: rgba(255,255,255,0.04) !important;
         border: 1px solid rgba(255,255,255,0.08) !important;
-        border-radius: 12px !important;
-        color: #E8EDF5 !important;
-        padding: 0.6rem 1rem !important;
+        border-radius: 14px !important;
+        color: #e6f1ff !important;
+        padding: 0.8rem 1.2rem !important;
+        font-family: 'Inter', sans-serif !important;
+        transition: all 0.2s;
     }
-    .stNumberInput input:focus { border-color: #3B82F6 !important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important; }
-    .stAlert { border-radius: 16px !important; background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.06) !important; backdrop-filter: blur(8px); }
-    .footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.06); text-align: center; font-size: 0.85rem; color: #64748B; }
-    .footer span { color: #93C5FD; }
+    .stNumberInput input:focus, .stTextArea textarea:focus {
+        border-color: #00d4ff !important;
+        box-shadow: 0 0 0 4px rgba(0,212,255,0.15) !important;
+    }
+    
+    /* Dataframe - dark mode đẹp */
+    .dataframe {
+        background: transparent !important;
+        color: #e6f1ff !important;
+        border-collapse: collapse !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    .dataframe th {
+        background: rgba(0,212,255,0.08) !important;
+        color: #64ffda !important;
+        font-weight: 600 !important;
+        padding: 0.8rem !important;
+        border-bottom: 2px solid rgba(0,212,255,0.15) !important;
+    }
+    .dataframe td {
+        padding: 0.8rem !important;
+        border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+    }
+    .dataframe tr:hover td {
+        background: rgba(0,212,255,0.04) !important;
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
+        background: transparent;
+        border-bottom: 2px solid rgba(255,255,255,0.05);
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-family: 'Inter', sans-serif;
+        font-weight: 500;
+        color: #8892b0;
+        padding: 0.6rem 0;
+        font-size: 1rem;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        color: #64ffda;
+        border-bottom: 2px solid #64ffda;
+    }
+    
+    /* Alert */
+    .stAlert {
+        border-radius: 16px !important;
+        background: rgba(255,255,255,0.03) !important;
+        border: 1px solid rgba(255,255,255,0.06) !important;
+        backdrop-filter: blur(8px);
+    }
+    .stAlert .st-emotion-cache-1wmy9hl { color: #e6f1ff !important; }
+    
+    /* Footer */
+    .footer {
+        margin-top: 4rem;
+        padding: 2rem 0 1rem;
+        border-top: 1px solid rgba(255,255,255,0.04);
+        text-align: center;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.8rem;
+        color: #495670;
+        letter-spacing: 0.05em;
+    }
+    .footer span { color: #64ffda; }
+    
+    /* Responsive */
     @media (max-width: 768px) {
-        .main-container { padding: 1rem; }
-        .app-title { font-size: 2rem; }
-        .app-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+        .main-header { font-size: 2.4rem; }
+        .card { padding: 1.2rem; }
+    }
+    
+    /* Linh Bảo component sẽ được style trong iframe, nhưng ta đảm bảo nó luôn nổi bật */
+    .linhbao-iframe {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 99999;
+        pointer-events: none; /* để click xuyên qua, nhưng component bên trong có pointer-events: auto */
+    }
+    .linhbao-iframe iframe {
+        pointer-events: auto;
+        border: none;
+        width: 180px;
+        height: 220px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Danh sách câu nói ──────────────────────────────────────────
+# ─── Dữ liệu lời thoại Linh Bảo ──────────────────────────────
 LINHBAO_SAYINGS = [
-    "Chào tiểu thư! Tôi là Linh Bảo đây! 🐼",
-    "Sẵn sàng tìm hành tinh mới chưa? 🚀",
-    "Hãy upload file CSV hoặc nhập thông số nhé!",
-    "Tiểu thư thông minh quá! 😊",
-    "Tôi ở đây để giúp tiểu thư mọi lúc!",
-    "Woohoo! Lại một hành tinh tiềm năng! 🌟",
-    "Tiểu thư có tin vào người ngoài hành tinh không?",
-    "Khám phá vũ trụ thật thú vị phải không? ✨",
-    "Cố lên! Dữ liệu đang chờ chúng ta! 💪",
-    "Nếu cần giúp, cứ gọi tôi nhé!",
-    "AstroMine-X – sản phẩm đỉnh cao! 😎",
-    "Hãy nhìn lên bầu trời và mơ ước! 🌌"
+    "Chào tiểu thư! Em là Linh Bảo đây! 🐼",
+    "Hôm nay chúng ta săn hành tinh nhé! 🚀",
+    "Dán dữ liệu hoặc tải CSV nào!",
+    "Tiểu thư thông minh quá đi! 😊",
+    "Em luôn sẵn sàng giúp đỡ!",
+    "Woohoo! Một hành tinh mới! 🌟",
+    "Tiểu thư có tin vào người ngoài hành tinh không? 👽",
+    "Vũ trụ bao la, chúng ta khám phá thôi! ✨",
+    "Cố lên, sắp có kết quả rồi! 💪",
+    "Nếu cần gì, cứ gọi em nhé!",
+    "AstroMine-X là đỉnh cao! 😎",
+    "Hãy luôn mơ ước, tiểu thư! 🌌"
 ]
 
-# ─── Hàm tạo Linh Bảo bằng components.html ─────────────────────
+# ─── Hàm tạo Linh Bảo (dùng iframe để đảm bảo JS chạy) ────
 def show_linhbao():
     sayings_json = json.dumps(LINHBAO_SAYINGS)
-    
-    html_code = f"""
+    html = f"""
     <!DOCTYPE html>
     <html>
     <head>
-        <style>
-            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{
-                background: transparent;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                font-family: 'Inter', sans-serif;
-            }}
-            .linhbao-wrapper {{
-                position: relative;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                cursor: pointer;
-                user-select: none;
-                transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            }}
-            .linhbao-wrapper:hover {{
-                transform: scale(1.05);
-            }}
-            .linhbao-bubble {{
-                background: #1E293B;
-                color: #E8EDF5;
-                padding: 10px 18px;
-                border-radius: 20px 20px 20px 4px;
-                font-size: 0.85rem;
-                max-width: 200px;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-                border: 1px solid rgba(255,255,255,0.08);
-                margin-bottom: 10px;
-                backdrop-filter: blur(8px);
-                text-align: center;
-                line-height: 1.4;
-                transition: all 0.3s ease;
-            }}
-            .linhbao-avatar {{
-                width: 72px;
-                height: 72px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 2.8rem;
-                box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
-                transition: all 0.3s ease;
-                animation: float 4s ease-in-out infinite;
-                border: 2px solid rgba(255,255,255,0.1);
-            }}
-            .linhbao-avatar:active {{
-                transform: scale(0.92);
-            }}
-            @keyframes float {{
-                0%, 100% {{ transform: translateY(0px); }}
-                50% {{ transform: translateY(-12px); }}
-            }}
-            .linhbao-speaking .linhbao-avatar {{
-                animation: speak 0.5s ease 3;
-            }}
-            @keyframes speak {{
-                0%, 100% {{ transform: scale(1); }}
-                50% {{ transform: scale(1.15) rotate(-5deg); }}
-            }}
-        </style>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Inter', sans-serif;
+            pointer-events: none;
+        }}
+        .wrapper {{
+            pointer-events: auto;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            user-select: none;
+        }}
+        .wrapper:hover {{ transform: scale(1.05); }}
+        .bubble {{
+            background: rgba(20,30,50,0.85);
+            backdrop-filter: blur(12px);
+            color: #e6f1ff;
+            padding: 10px 16px;
+            border-radius: 20px 20px 20px 4px;
+            font-size: 0.8rem;
+            max-width: 160px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            border: 1px solid rgba(0,212,255,0.15);
+            margin-bottom: 10px;
+            text-align: center;
+            line-height: 1.4;
+            transition: all 0.3s;
+        }}
+        .avatar {{
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #7b2ffc);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.6rem;
+            box-shadow: 0 8px 32px rgba(0,212,255,0.3);
+            animation: float 4s ease-in-out infinite;
+            border: 2px solid rgba(255,255,255,0.1);
+        }}
+        @keyframes float {{
+            0%, 100% {{ transform: translateY(0); }}
+            50% {{ transform: translateY(-10px); }}
+        }}
+        .speaking .avatar {{
+            animation: speak 0.5s ease 3;
+        }}
+        @keyframes speak {{
+            0%, 100% {{ transform: scale(1); }}
+            50% {{ transform: scale(1.15) rotate(-4deg); }}
+        }}
+    </style>
     </head>
     <body>
-        <div class="linhbao-wrapper" id="linhbaoWrapper" onclick="linhBaoSpeak()">
-            <div class="linhbao-bubble" id="linhbaoBubble">Chào tiểu thư! Click vào tôi nhé 🐾</div>
-            <div class="linhbao-avatar" id="linhbaoAvatar">🐼</div>
-        </div>
-        <script>
-            const sayings = {sayings_json};
-            const bubble = document.getElementById('linhbaoBubble');
-            const avatar = document.getElementById('linhbaoAvatar');
-            const wrapper = document.getElementById('linhbaoWrapper');
+    <div class="wrapper" onclick="say()">
+        <div class="bubble" id="bubble">🐼 Click vào em!</div>
+        <div class="avatar" id="avatar">🐼</div>
+    </div>
+    <script>
+        const sayings = {sayings_json};
+        const bubble = document.getElementById('bubble');
+        const avatar = document.getElementById('avatar');
+        const wrapper = document.querySelector('.wrapper');
 
-            function linhBaoSpeak() {{
-                const randomIndex = Math.floor(Math.random() * sayings.length);
-                const msg = sayings[randomIndex];
-                bubble.textContent = msg;
-                avatar.classList.remove('linhbao-speaking');
-                // Force reflow để animation chạy lại
-                void avatar.offsetWidth;
-                avatar.classList.add('linhbao-speaking');
+        function say() {{
+            const idx = Math.floor(Math.random() * sayings.length);
+            bubble.textContent = sayings[idx];
+            avatar.classList.remove('speaking');
+            void avatar.offsetWidth;
+            avatar.classList.add('speaking');
+        }}
+
+        setTimeout(() => {{
+            bubble.textContent = 'Tiểu thư, em đây! 🌟';
+        }}, 2000);
+
+        // Hiệu ứng hover
+        wrapper.addEventListener('mouseenter', () => {{
+            if (!bubble.textContent.includes('Click')) {{
+                bubble.textContent = '👆 Click để nói chuyện!';
+                setTimeout(() => {{
+                    if (bubble.textContent === '👆 Click để nói chuyện!') {{
+                        bubble.textContent = sayings[Math.floor(Math.random() * sayings.length)];
+                    }}
+                }}, 1500);
             }}
-
-            // Lời chào sau 2 giây
-            setTimeout(() => {{
-                bubble.textContent = 'Tiểu thư, tôi là Linh Bảo! Rất vui được đồng hành cùng bạn! 🐼✨';
-            }}, 2000);
-
-            // Hiệu ứng hover hint
-            wrapper.addEventListener('mouseenter', () => {{
-                if (!bubble.textContent.includes('Click')) {{
-                    bubble.textContent = '👆 Click vào tôi để trò chuyện!';
-                    setTimeout(() => {{
-                        if (bubble.textContent === '👆 Click vào tôi để trò chuyện!') {{
-                            bubble.textContent = sayings[Math.floor(Math.random() * sayings.length)];
-                        }}
-                    }}, 1500);
-                }}
-            }});
-        </script>
+        }});
+    </script>
     </body>
     </html>
     """
-    
-    # Dùng components.html với chiều cao cố định để không chiếm quá nhiều không gian
-    st.components.v1.html(html_code, height=200, scrolling=False)
+    st.components.v1.html(html, height=220, scrolling=False)
 
-# ─── Sidebar ──────────────────────────────────────────────────────
+# ─── Hàm lưu bảng xếp hạng vào file JSON ──────────────────
+RANKING_FILE = "rankings.json"
+
+def load_rankings():
+    if os.path.exists(RANKING_FILE):
+        with open(RANKING_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_rankings(rankings):
+    with open(RANKING_FILE, 'w', encoding='utf-8') as f:
+        json.dump(rankings, f, indent=2, ensure_ascii=False)
+
+# ─── Khởi tạo session_state ──────────────────────────────────
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+    st.session_state.rankings = load_rankings()
+    st.session_state.nasa_data = None
+
+# ─── Sidebar ──────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div class="sidebar-content">
-        <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1.5rem;">
-            <span style="font-size:2rem;">🪐</span>
-            <span style="font-size:1.2rem; font-weight:700;">AstroMine-X</span>
-        </div>
-        <div class="sidebar-text">
-            <strong style="color:#E8EDF5;">Phát hiện ngoại hành tinh</strong> từ dữ liệu TESS với AI &amp; Linh Bảo.
-        </div>
-        <div class="sidebar-divider"></div>
-        <div class="sidebar-title">📖 Hướng dẫn</div>
-        <div class="sidebar-text">
-            <ol style="padding-left:1.2rem; margin:0.5rem 0;">
-                <li>Tải lên CSV (6 cột)</li>
-                <li>Hoặc nhập thông số</li>
-                <li>Nhấn <strong>Phân tích</strong></li>
-            </ol>
-            <p style="margin-top:0.8rem;">
-                <span style="color:#93C5FD;">Độ chính xác:</span> 85.56%<br>
-                <span style="color:#93C5FD;">Mô hình:</span> LightGBM
-            </p>
-        </div>
-        <div class="sidebar-divider"></div>
-        <div class="sidebar-text" style="font-size:0.8rem; color:#64748B;">
-            Phiên bản 3.0 · © 2026<br>
-            Thiết kế bởi <span style="color:#93C5FD;">Linh Bảo</span> &amp; Team
-        </div>
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1.5rem;">
+        <span style="font-size:2.2rem;">🪐</span>
+        <span style="font-family:'Orbitron',sans-serif; font-size:1.1rem; font-weight:700; color:#64ffda;">AstroMine-X</span>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Phần đăng nhập
+    st.markdown('<div class="sidebar-title">🔐 Tài khoản</div>', unsafe_allow_html=True)
+    if not st.session_state.logged_in:
+        username = st.text_input("Tên", placeholder="Nhập tên của bạn", key="login_name")
+        if st.button("🚀 Đăng nhập / Đăng ký", use_container_width=True):
+            if username.strip():
+                st.session_state.username = username.strip()
+                st.session_state.logged_in = True
+                if st.session_state.username not in st.session_state.rankings:
+                    st.session_state.rankings[st.session_state.username] = 0
+                    save_rankings(st.session_state.rankings)
+                st.success(f"✅ Chào {st.session_state.username}!")
+                st.rerun()
+            else:
+                st.warning("Vui lòng nhập tên!")
+    else:
+        st.success(f"👋 {st.session_state.username}")
+        st.write(f"🏆 **Điểm**: {st.session_state.rankings.get(st.session_state.username, 0)}")
+        if st.button("Đăng xuất", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            st.rerun()
+    
+    st.markdown("---")
+    st.markdown('<div class="sidebar-title">📖 Hướng dẫn nhanh</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="sidebar-text">
+        <strong>3 cách nhập dữ liệu:</strong><br>
+        1️⃣ Dán trực tiếp (CSV)<br>
+        2️⃣ Tải file CSV<br>
+        3️⃣ Kết nối NASA (tải mới)
+        <br><br>
+        <strong>Độ chính xác:</strong> 85.56%<br>
+        <strong>Mô hình:</strong> LightGBM
+        <br><br>
+        <span style="color:#64ffda;">💡 Kéo các thanh trượt ở tab "Dự đoán nhanh" để thấy kết quả tức thì.</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.caption("v3.0 · © 2026 · with ❤️ by Linh Bảo")
 
-# ─── Hiển thị Linh Bảo ──────────────────────────────────────────
+# ─── HIỂN THỊ LINH BẢO ───────────────────────────────────────
 show_linhbao()
 
-# ─── Nội dung chính ──────────────────────────────────────────────
-st.markdown("""
-<div class="main-container">
-    <div class="app-header">
-        <div>
-            <div class="app-title">🪐 AstroMine-X</div>
-            <div class="app-subtitle">Khám phá ngoại hành tinh với trí tuệ nhân tạo</div>
-        </div>
-        <div class="app-badge">⚡ AI-powered · TESS · v3.0</div>
-    </div>
-""", unsafe_allow_html=True)
+# ─── NỘI DUNG CHÍNH ──────────────────────────────────────────
+st.markdown('<div class="main-header">🪐 AstroMine-X Pro</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">✨ Khám phá ngoại hành tinh với AI & Linh Bảo • Dữ liệu từ TESS</div>', unsafe_allow_html=True)
 
-# ─── Load model ──────────────────────────────────────────────────
-try:
-    model = joblib.load("planet_model_lgb_fixed.pkl")
-    scaler = joblib.load("scaler_lgb_fixed.pkl")
-    st.markdown("""
-    <div class="card" style="border-left: 4px solid #3B82F6; padding:0.8rem 1.5rem; background:rgba(59,130,246,0.05);">
-        <span style="color:#93C5FD;">✅ Model & Scaler đã được tải thành công</span>
-    </div>
-    """, unsafe_allow_html=True)
-except Exception as e:
-    st.error(f"❌ Lỗi tải model: {e}")
+# ─── Load model ──────────────────────────────────────────────
+@st.cache_resource
+def load_model():
+    try:
+        model = joblib.load("planet_model_lgb_fixed.pkl")
+        scaler = joblib.load("scaler_lgb_fixed.pkl")
+        return model, scaler
+    except:
+        return None, None
+
+model, scaler = load_model()
+if model is None:
+    st.error("❌ Không tìm thấy model. Vui lòng đảm bảo có file 'planet_model_lgb_fixed.pkl' và 'scaler_lgb_fixed.pkl'.")
     st.stop()
 
-# ─── Tabs ────────────────────────────────────────────────────────
-tab1, tab2 = st.tabs(["📂 Tải file CSV", "✏️ Nhập thủ công"])
+st.success("✅ Model & Scaler đã sẵn sàng")
 
+# ─── Danh sách tab ───────────────────────────────────────────
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📝 Dán dữ liệu",
+    "📂 Tải CSV",
+    "🌐 NASA",
+    "🎯 Dự đoán nhanh",
+    "🏆 Bảng xếp hạng"
+])
+
+# ─── Hàm phân tích chung ─────────────────────────────────────
+def analyze_data(df, show_chart=True, update_score=True):
+    feature_cols = ['pl_orbper', 'pl_radj', 'pl_bmasse', 'pl_orbincl', 'st_teff', 'st_logg']
+    missing = [c for c in feature_cols if c not in df.columns]
+    if missing:
+        st.error(f"❌ Thiếu cột: {missing}")
+        return None
+    X = df[feature_cols].copy()
+    X = X.fillna(X.mean())
+    X_scaled = scaler.transform(X)
+    proba = model.predict_proba(X_scaled)[:, 1]
+    df_result = df.copy()
+    df_result['Confidence'] = np.round(proba, 3)
+    df_result['Prediction'] = (proba > 0.5).astype(int)
+    
+    # Đếm số hành tinh tiềm năng
+    n_planets = int((proba > 0.5).sum())
+    
+    # Hiển thị kết quả
+    st.subheader(f"📊 Kết quả – {len(df_result)} ứng viên, {n_planets} hành tinh tiềm năng")
+    st.dataframe(df_result[['Confidence', 'Prediction']], use_container_width=True)
+    
+    # Biểu đồ tương tác
+    if show_chart:
+        fig = px.histogram(
+            df_result, x='Confidence', nbins=30,
+            title='Phân bố độ tin cậy',
+            color_discrete_sequence=['#00d4ff'],
+            labels={'Confidence': 'Độ tin cậy', 'count': 'Số lượng'}
+        )
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#a8b2d1',
+            showlegend=False,
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=350
+        )
+        fig.update_xaxes(gridcolor='rgba(255,255,255,0.05)')
+        fig.update_yaxes(gridcolor='rgba(255,255,255,0.05)')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Cập nhật điểm cho bảng xếp hạng
+    if update_score and st.session_state.logged_in:
+        current_score = st.session_state.rankings.get(st.session_state.username, 0)
+        if n_planets > current_score:
+            st.session_state.rankings[st.session_state.username] = n_planets
+            save_rankings(st.session_state.rankings)
+            st.success(f"🎉 Cập nhật điểm: {n_planets} hành tinh! (kỷ lục mới)")
+        else:
+            st.info(f"📌 Điểm hiện tại: {current_score} – lần này tìm được {n_planets} hành tinh.")
+    
+    return df_result
+
+# ─── TAB 1: Dán dữ liệu ─────────────────────────────────────
 with tab1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="icon">📁</span> Tải lên dữ liệu hành tinh</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="icon">📝</span> Dán trực tiếp dữ liệu CSV</div>', unsafe_allow_html=True)
     
-    uploaded_file = st.file_uploader("Chọn file CSV (đúng 6 cột)", type=['csv'])
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        st.dataframe(df.head(10), use_container_width=True)
-        if st.button("🔍 Phân tích", key="analyze_csv", use_container_width=True):
-            feature_cols = ['pl_orbper', 'pl_radj', 'pl_bmasse', 'pl_orbincl', 'st_teff', 'st_logg']
-            missing = [col for col in feature_cols if col not in df.columns]
-            if missing:
-                st.error(f"❌ Thiếu các cột: {missing}. Vui lòng kiểm tra file.")
-                st.stop()
-            X = df[feature_cols].copy()
-            X = X.fillna(X.mean())
-            X_scaled = scaler.transform(X)
-            proba = model.predict_proba(X_scaled)[:, 1]
-            df_result = df.copy()
-            df_result['Confidence'] = np.round(proba, 3)
-            
-            st.markdown("#### 📊 Kết quả dự đoán")
-            st.dataframe(df_result[['Confidence']], use_container_width=True)
-            
-            fig, ax = plt.subplots(figsize=(8, 4))
-            ax.hist(df_result['Confidence'], bins=20, color='#60A5FA', edgecolor='#1E293B', alpha=0.8)
-            ax.set_xlabel('Độ tin cậy', color='#94A3B8')
-            ax.set_ylabel('Số lượng', color='#94A3B8')
-            ax.set_title('Phân bố độ tin cậy', color='#E8EDF5')
-            ax.tick_params(colors='#94A3B8')
-            ax.spines['bottom'].set_color('#334155')
-            ax.spines['left'].set_color('#334155')
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.set_facecolor('transparent')
-            fig.patch.set_facecolor('transparent')
-            st.pyplot(fig)
+    example = """pl_orbper,pl_radj,pl_bmasse,pl_orbincl,st_teff,st_logg
+1.17,1.187,2.36,89.9,5613.0,4.200
+3.23,1.169,1.89,88.93,5647.0,4.236
+5.47,0.987,0.56,89.95,5626.0,4.100
+0.82,0.456,0.12,88.50,5780.0,4.500
+2.15,0.789,0.45,87.50,5500.0,4.100"""
+    
+    with st.expander("📋 Xem dữ liệu mẫu (click để copy)"):
+        st.code(example, language="text")
+        if st.button("📥 Lấy dữ liệu mẫu", key="load_sample_paste"):
+            st.session_state.paste_default = example
+            st.rerun()
+    
+    default_text = st.session_state.get('paste_default', '')
+    pasted = st.text_area("✏️ Dán dữ liệu vào đây (cách nhau bởi dấu phẩy hoặc tab)", 
+                          value=default_text, height=200, key="paste_area")
+    
+    if st.button("🔍 Phân tích", key="btn_paste"):
+        if pasted.strip():
+            try:
+                df = pd.read_csv(StringIO(pasted), sep=None, engine='python')
+                analyze_data(df)
+            except Exception as e:
+                st.error(f"❌ Lỗi đọc dữ liệu: {e}. Vui lòng kiểm tra định dạng.")
+        else:
+            st.warning("Vui lòng dán dữ liệu trước!")
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ─── TAB 2: Tải CSV ──────────────────────────────────────────
 with tab2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="icon">✏️</span> Nhập thông số hành tinh</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="icon">📂</span> Tải lên file CSV</div>', unsafe_allow_html=True)
+    uploaded = st.file_uploader("Chọn file CSV (6 cột)", type=['csv'])
+    if uploaded is not None:
+        df = pd.read_csv(uploaded)
+        st.dataframe(df.head(), use_container_width=True)
+        if st.button("🔍 Phân tích", key="btn_csv"):
+            analyze_data(df)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ─── TAB 3: Kết nối NASA ─────────────────────────────────────
+with tab3:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="icon">🌐</span> Tải dữ liệu mới từ NASA</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background:rgba(0,212,255,0.05); border-radius:12px; padding:0.8rem 1.2rem; margin-bottom:1rem; border-left:3px solid #00d4ff;">
+        📡 Tải trực tiếp dữ liệu ứng viên hành tinh từ <b>NASA Exoplanet Archive</b>.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("📥 Tải dữ liệu NASA", key="btn_nasa"):
+        with st.spinner("Đang tải từ NASA..."):
+            try:
+                url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+pl_orbper,pl_radj,pl_bmasse,pl_orbincl,st_teff,st_logg+from+ps+where+pl_discmethod+like+'Transit'&format=csv"
+                df_nasa = pd.read_csv(url)
+                st.session_state.nasa_data = df_nasa
+                st.success(f"✅ Đã tải {len(df_nasa)} ứng viên mới!")
+                st.dataframe(df_nasa.head(), use_container_width=True)
+            except Exception as e:
+                st.error(f"❌ Lỗi tải: {e}")
+    
+    if st.session_state.nasa_data is not None:
+        if st.button("🔍 Phân tích dữ liệu NASA", key="btn_analyze_nasa"):
+            analyze_data(st.session_state.nasa_data)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ─── TAB 4: Dự đoán nhanh ────────────────────────────────────
+with tab4:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="icon">🎯</span> Dự đoán nhanh – Kéo thanh trượt</div>', unsafe_allow_html=True)
+    st.markdown("Thay đổi thông số, kết quả sẽ cập nhật ngay lập tức.")
     
     col1, col2 = st.columns(2)
     with col1:
-        orbper = st.number_input('🔄 Chu kỳ (ngày)', value=5.0, step=0.1, format="%.2f")
-        radj = st.number_input('📏 Bán kính (Rjup)', value=1.2, step=0.1, format="%.2f")
-        bmasse = st.number_input('⚖️ Khối lượng (Mjup)', value=2.5, step=0.1, format="%.2f")
+        orbper = st.slider('🔄 Chu kỳ (ngày)', 0.1, 50.0, 5.0, 0.1)
+        radj = st.slider('📏 Bán kính (Rjup)', 0.1, 5.0, 1.2, 0.01)
+        bmasse = st.slider('⚖️ Khối lượng (Mjup)', 0.01, 20.0, 2.5, 0.01)
     with col2:
-        orbincl = st.number_input('📐 Độ nghiêng (độ)', value=85.0, step=0.5, format="%.1f")
-        st_teff = st.number_input('🌡️ Nhiệt độ sao (K)', value=5500.0, step=100.0, format="%.0f")
-        st_logg = st.number_input('📊 log(g) (cm/s²)', value=4.2, step=0.1, format="%.2f")
+        orbincl = st.slider('📐 Độ nghiêng (độ)', 10, 90, 85, 1)
+        st_teff = st.slider('🌡️ Nhiệt độ sao (K)', 3000, 8000, 5500, 100)
+        st_logg = st.slider('📊 log(g) (cm/s²)', 3.0, 5.5, 4.2, 0.01)
     
-    if st.button("🔮 Dự đoán", key="predict_manual", use_container_width=True):
+    if st.button("🔮 Dự đoán", key="btn_slider"):
         input_data = np.array([[orbper, radj, bmasse, orbincl, st_teff, st_logg]])
         input_scaled = scaler.transform(input_data)
         proba = model.predict_proba(input_scaled)[0][1]
         
-        st.markdown("#### Kết quả")
+        st.markdown("### Kết quả")
         if proba > 0.5:
             st.success(f"✅ **CÓ HÀNH TINH!** Độ tin cậy: {proba*100:.2f}%")
             st.balloons()
         else:
             st.warning(f"❌ **KHÔNG CÓ HÀNH TINH.** Độ tin cậy: {proba*100:.2f}%")
+        
+        # Hiển thị thanh đo độ tin cậy
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = proba*100,
+            title = {'text': "Độ tin cậy (%)", 'font': {'color': '#a8b2d1'}},
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            gauge = {
+                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#a8b2d1"},
+                'bar': {'color': "#7b2ffc" if proba>0.5 else "#ff6fd8"},
+                'steps': [
+                    {'range': [0, 50], 'color': 'rgba(255,100,100,0.15)'},
+                    {'range': [50, 100], 'color': 'rgba(0,212,255,0.15)'}
+                ],
+                'threshold': {
+                    'line': {'color': "#64ffda", 'width': 4},
+                    'thickness': 0.75,
+                    'value': proba*100
+                }
+            }
+        ))
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#a8b2d1',
+            height=300,
+            margin=dict(l=30, r=30, t=30, b=30)
+        )
+        st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── Footer ──────────────────────────────────────────────────────
+# ─── TAB 5: Bảng xếp hạng ────────────────────────────────────
+with tab5:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="icon">🏆</span> Bảng xếp hạng Thợ săn hành tinh</div>', unsafe_allow_html=True)
+    
+    rankings = st.session_state.rankings
+    if rankings:
+        sorted_rank = sorted(rankings.items(), key=lambda x: x[1], reverse=True)
+        rank_df = pd.DataFrame(sorted_rank, columns=['Người dùng', 'Điểm'])
+        rank_df.index = rank_df.index + 1
+        rank_df.index.name = 'Hạng'
+        
+        # Đánh dấu người dùng hiện tại
+        if st.session_state.logged_in:
+            current = st.session_state.username
+            rank_df[''] = rank_df['Người dùng'].apply(lambda x: '⭐' if x == current else '')
+        
+        st.dataframe(rank_df, use_container_width=True)
+        
+        # Biểu đồ cột top 10
+        top10 = sorted_rank[:10]
+        if top10:
+            fig = px.bar(
+                x=[u[0] for u in top10], 
+                y=[u[1] for u in top10],
+                title="Top 10 Thợ săn hành tinh",
+                labels={'x': 'Người dùng', 'y': 'Điểm'},
+                color=[u[0] for u in top10],
+                color_discrete_sequence=px.colors.sequential.Blues_r
+            )
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='#a8b2d1',
+                showlegend=False,
+                height=350,
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            fig.update_xaxes(gridcolor='rgba(255,255,255,0.05)')
+            fig.update_yaxes(gridcolor='rgba(255,255,255,0.05)')
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("📭 Chưa có người dùng nào. Hãy đăng nhập và bắt đầu săn tìm hành tinh!")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ─── FOOTER ───────────────────────────────────────────────────
 st.markdown("""
 <div class="footer">
-    🚀 AstroMine-X v3.0 · Phát triển với ❤️ và sự đồng hành của <span>Linh Bảo</span> 🐼<br>
-    Dữ liệu từ sứ mệnh TESS · NASA
-</div>
+    🚀 AstroMine-X Pro · Phiên bản 3.0 · Phát triển với ❤️ và Linh Bảo 🐼<br>
+    Dữ liệu từ NASA Exoplanet Archive · © 2026
 </div>
 """, unsafe_allow_html=True)
