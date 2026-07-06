@@ -11,7 +11,7 @@ from io import StringIO
 
 # ─── Cấu hình trang ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="🪐 AstroMine-X Pro",
+    page_title="🪐 AstroMine-X ",
     page_icon="🌌",
     layout="wide",
     initial_sidebar_state="expanded"
