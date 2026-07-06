@@ -7,7 +7,6 @@ import os
 import requests
 from io import StringIO
 from datetime import datetime
-import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -197,7 +196,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Linh Bảo (dùng iframe, đã sửa lỗi) ────────────────────────
+# ─── Linh Bảo ────────────────────────────────────────────────────
 LINHBAO_SAYINGS = [
     "Chào tiểu thư! Em là Linh Bảo đây! 🐼",
     "Sẵn sàng săn hành tinh chưa? 🚀",
@@ -348,13 +347,20 @@ def save_rankings(rankings):
     with open(RANKING_FILE, 'w', encoding='utf-8') as f:
         json.dump(rankings, f, indent=2, ensure_ascii=False)
 
-# ─── Khởi tạo session ──────────────────────────────────────────
+# ─── KHỞI TẠO SESSION_STATE AN TOÀN ─────────────────────────────
+# Sử dụng get để tránh lỗi AttributeError nếu chưa có key
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
+if 'username' not in st.session_state:
     st.session_state.username = ""
+if 'rankings' not in st.session_state:
     st.session_state.rankings = load_rankings()
+if 'nasa_data' not in st.session_state:
     st.session_state.nasa_data = None
-    st.session_state.history = []  # Lưu lịch sử phân tích
+if 'history' not in st.session_state:
+    st.session_state.history = []
+if 'paste_default' not in st.session_state:
+    st.session_state.paste_default = ""
 
 # ─── Sidebar ────────────────────────────────────────────────────
 with st.sidebar:
@@ -413,12 +419,13 @@ st.markdown('<div class="sub-header">✨ Khám phá ngoại hành tinh với AI 
 # ─── Hàm phân tích chung ──────────────────────────────────────
 def analyze_data(df, show_chart=True, update_score=True):
     feature_cols = ['pl_orbper', 'pl_radj', 'pl_bmasse', 'pl_orbincl', 'st_teff', 'st_logg']
-    # Kiểm tra tên cột (có thể khác nhau)
-    # Nếu không có, thử với tên khác từ NASA
-    if 'pl_bmassj' in df.columns:
-        df = df.rename(columns={'pl_bmassj': 'pl_bmasse'})
-    if 'pl_bmass' in df.columns:
-        df = df.rename(columns={'pl_bmass': 'pl_bmasse'})
+    # Nếu có cột khác tương ứng
+    rename_map = {}
+    for col in df.columns:
+        if col.lower() in ['pl_bmassj', 'pl_bmass'] and 'pl_bmasse' not in df.columns:
+            rename_map[col] = 'pl_bmasse'
+    if rename_map:
+        df = df.rename(columns=rename_map)
     
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
@@ -465,13 +472,15 @@ def analyze_data(df, show_chart=True, update_score=True):
         else:
             st.info(f"📌 Điểm hiện tại: {current_score} – lần này tìm được {n_planets} hành tinh.")
     
-    # Lưu lịch sử
-    st.session_state.history.append({
+    # Lưu lịch sử (an toàn)
+    history = st.session_state.history
+    history.append({
         'time': datetime.now().strftime("%H:%M:%S"),
         'n_candidates': len(df_result),
         'n_planets': n_planets,
         'user': st.session_state.username if st.session_state.logged_in else 'Anonymous'
     })
+    st.session_state.history = history
     return df_result
 
 # ─── Các tab ────────────────────────────────────────────────────
@@ -539,7 +548,6 @@ with tab3:
         if st.button("📥 Tải dữ liệu NASA", key="btn_nasa"):
             with st.spinner("Đang kết nối NASA..."):
                 try:
-                    # Sử dụng query chuẩn, bỏ WHERE để lấy tất cả (tránh lỗi cột)
                     url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
                     params = {
                         "query": "SELECT pl_orbper, pl_radj, pl_bmassj, pl_orbincl, st_teff, st_logg FROM ps",
@@ -634,16 +642,15 @@ with tab4:
 with tab5:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title"><span class="icon">📊</span> Thống kê tổng quan</div>', unsafe_allow_html=True)
-    if st.session_state.history:
+    if len(st.session_state.history) > 0:
         hist_df = pd.DataFrame(st.session_state.history)
         st.dataframe(hist_df, use_container_width=True)
-        # Biểu đồ
         fig = px.line(hist_df, x='time', y='n_planets', title='Số hành tinh phát hiện theo thời gian',
                       labels={'time': 'Thời gian', 'n_planets': 'Số hành tinh'})
         fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#a8b2d1')
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Chưa có lịch sử phân tích. Hãy bắt đầu dự đoán!")
+        st.info("📭 Chưa có lịch sử phân tích. Hãy bắt đầu dự đoán!")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── Tab 6: Bảng xếp hạng ──────────────────────────────────────
@@ -660,7 +667,6 @@ with tab6:
             current = st.session_state.username
             rank_df[''] = rank_df['Người dùng'].apply(lambda x: '⭐' if x == current else '')
         st.dataframe(rank_df, use_container_width=True)
-        # Biểu đồ top 10
         top10 = sorted_rank[:10]
         if top10:
             fig = px.bar(x=[u[0] for u in top10], y=[u[1] for u in top10],
@@ -670,13 +676,13 @@ with tab6:
                               font_color='#a8b2d1', showlegend=False, height=350)
             st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Chưa có người dùng. Hãy đăng nhập và săn hành tinh!")
+        st.info("📭 Chưa có người dùng. Hãy đăng nhập và săn hành tinh!")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── Footer ──────────────────────────────────────────────────────
 st.markdown("""
 <div class="footer">
-    🚀 AstroMine-X Pro · v3.1 · Phát triển với ❤️ và Linh Bảo 🐼<br>
+    🚀 AstroMine-X Pro · v3.2 · Phát triển với ❤️ và Linh Bảo 🐼<br>
     Dữ liệu từ NASA Exoplanet Archive · © 2026
 </div>
 """, unsafe_allow_html=True)
