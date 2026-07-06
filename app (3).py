@@ -4,42 +4,26 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 import json
-import random
-import time
 
 # ─── Cấu hình trang ────────────────────────────────────────────────
 st.set_page_config(
     page_title="AstroMine-X | Exoplanet AI",
     page_icon="🪐",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# ─── CSS chuyên nghiệp ─────────────────────────────────────────────
+# ─── CSS chung (giữ nguyên phần trước) ───────────────────────────
 st.markdown("""
 <style>
-    /* Reset và font */
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
+    /* Toàn bộ CSS như cũ, giữ nguyên */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
-
     html, body, .stApp {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         background: #0B0E17;
         color: #E8EDF5;
     }
-
-    /* Container chính */
-    .main-container {
-        padding: 2rem 3rem;
-        max-width: 1400px;
-        margin: 0 auto;
-    }
-
-    /* Header */
+    .main-container { padding: 2rem 3rem; max-width: 1400px; margin: 0 auto; }
     .app-header {
         display: flex;
         justify-content: space-between;
@@ -56,12 +40,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         letter-spacing: -0.02em;
     }
-    .app-subtitle {
-        font-size: 1rem;
-        font-weight: 300;
-        color: #94A3B8;
-        margin-top: 0.25rem;
-    }
+    .app-subtitle { font-size: 1rem; font-weight: 300; color: #94A3B8; margin-top: 0.25rem; }
     .app-badge {
         background: rgba(96, 165, 250, 0.15);
         padding: 0.4rem 1.2rem;
@@ -70,12 +49,9 @@ st.markdown("""
         border: 1px solid rgba(96, 165, 250, 0.25);
         color: #93C5FD;
     }
-
-    /* Card */
     .card {
         background: rgba(255,255,255,0.03);
         backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
         border-radius: 24px;
         padding: 1.8rem 2rem;
         border: 1px solid rgba(255,255,255,0.06);
@@ -83,108 +59,14 @@ st.markdown("""
         margin-bottom: 2rem;
         transition: all 0.2s ease;
     }
-    .card:hover {
-        border-color: rgba(255,255,255,0.12);
-        box-shadow: 0 12px 48px rgba(0,0,0,0.5);
-    }
-    .card-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 1.2rem;
-        color: #E8EDF5;
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-    }
-    .card-title .icon {
-        font-size: 1.4rem;
-    }
-
-    /* Sidebar */
-    .css-1d391kg, .css-12oz5g7 {
-        background: #0F1320 !important;
-    }
-    .sidebar-content {
-        padding: 1.5rem 0.5rem;
-    }
-    .sidebar-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #E8EDF5;
-        margin-bottom: 1rem;
-    }
-    .sidebar-text {
-        font-size: 0.9rem;
-        color: #94A3B8;
-        line-height: 1.6;
-    }
-    .sidebar-divider {
-        height: 1px;
-        background: rgba(255,255,255,0.06);
-        margin: 1.5rem 0;
-    }
-
-    /* Linh Bảo - phiên bản mới đẹp hơn */
-    .linhbao-wrapper {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        z-index: 99999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
-        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    .linhbao-wrapper:hover {
-        transform: scale(1.05);
-    }
-    .linhbao-bubble {
-        background: #1E293B;
-        color: #E8EDF5;
-        padding: 10px 18px;
-        border-radius: 20px 20px 20px 4px;
-        font-size: 0.85rem;
-        font-weight: 400;
-        max-width: 200px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-        border: 1px solid rgba(255,255,255,0.08);
-        margin-bottom: 10px;
-        backdrop-filter: blur(8px);
-        transition: all 0.3s ease;
-        text-align: center;
-        line-height: 1.4;
-    }
-    .linhbao-avatar {
-        width: 72px;
-        height: 72px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.8rem;
-        box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
-        transition: all 0.3s ease;
-        animation: float 4s ease-in-out infinite;
-        border: 2px solid rgba(255,255,255,0.1);
-    }
-    .linhbao-avatar:active {
-        transform: scale(0.92);
-    }
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-12px); }
-    }
-    .linhbao-speaking .linhbao-avatar {
-        animation: speak 0.5s ease 3;
-    }
-    @keyframes speak {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.15) rotate(-5deg); }
-    }
-
-    /* Buttons */
+    .card:hover { border-color: rgba(255,255,255,0.12); box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
+    .card-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1.2rem; color: #E8EDF5; display: flex; align-items: center; gap: 0.6rem; }
+    .card-title .icon { font-size: 1.4rem; }
+    .css-1d391kg, .css-12oz5g7 { background: #0F1320 !important; }
+    .sidebar-content { padding: 1.5rem 0.5rem; }
+    .sidebar-title { font-size: 1.1rem; font-weight: 600; color: #E8EDF5; margin-bottom: 1rem; }
+    .sidebar-text { font-size: 0.9rem; color: #94A3B8; line-height: 1.6; }
+    .sidebar-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 1.5rem 0; }
     .stButton button {
         background: linear-gradient(135deg, #3B82F6, #8B5CF6) !important;
         color: white !important;
@@ -195,55 +77,15 @@ st.markdown("""
         transition: all 0.2s ease !important;
         box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
     }
-    .stButton button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 28px rgba(59, 130, 246, 0.4) !important;
-    }
-    .stButton button:active {
-        transform: scale(0.96) !important;
-    }
-
-    /* Dataframe */
-    .dataframe {
-        background: transparent !important;
-        color: #E8EDF5 !important;
-        border-collapse: collapse !important;
-    }
-    .dataframe th {
-        background: rgba(255,255,255,0.05) !important;
-        color: #93C5FD !important;
-        font-weight: 600 !important;
-        padding: 0.8rem !important;
-        border-bottom: 2px solid rgba(255,255,255,0.08) !important;
-    }
-    .dataframe td {
-        padding: 0.8rem !important;
-        border-bottom: 1px solid rgba(255,255,255,0.04) !important;
-    }
-    .dataframe tr:hover {
-        background: rgba(255,255,255,0.03) !important;
-    }
-
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 1.5rem;
-        background: transparent;
-        border-bottom: 2px solid rgba(255,255,255,0.06);
-    }
-    .stTabs [data-baseweb="tab"] {
-        font-weight: 500;
-        color: #94A3B8;
-        padding: 0.6rem 0;
-        font-size: 1rem;
-        border-bottom: 2px solid transparent;
-        transition: all 0.2s;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #60A5FA;
-        border-bottom: 2px solid #60A5FA;
-    }
-
-    /* Form inputs */
+    .stButton button:hover { transform: translateY(-2px) !important; box-shadow: 0 8px 28px rgba(59, 130, 246, 0.4) !important; }
+    .stButton button:active { transform: scale(0.96) !important; }
+    .dataframe { background: transparent !important; color: #E8EDF5 !important; border-collapse: collapse !important; }
+    .dataframe th { background: rgba(255,255,255,0.05) !important; color: #93C5FD !important; font-weight: 600 !important; padding: 0.8rem !important; border-bottom: 2px solid rgba(255,255,255,0.08) !important; }
+    .dataframe td { padding: 0.8rem !important; border-bottom: 1px solid rgba(255,255,255,0.04) !important; }
+    .dataframe tr:hover { background: rgba(255,255,255,0.03) !important; }
+    .stTabs [data-baseweb="tab-list"] { gap: 1.5rem; background: transparent; border-bottom: 2px solid rgba(255,255,255,0.06); }
+    .stTabs [data-baseweb="tab"] { font-weight: 500; color: #94A3B8; padding: 0.6rem 0; font-size: 1rem; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] { color: #60A5FA; border-bottom: 2px solid #60A5FA; }
     .stNumberInput input, .stFileUploader > div {
         background: rgba(255,255,255,0.04) !important;
         border: 1px solid rgba(255,255,255,0.08) !important;
@@ -251,48 +93,19 @@ st.markdown("""
         color: #E8EDF5 !important;
         padding: 0.6rem 1rem !important;
     }
-    .stNumberInput input:focus {
-        border-color: #3B82F6 !important;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
-    }
-
-    /* Success/Warning */
-    .stAlert {
-        border-radius: 16px !important;
-        background: rgba(255,255,255,0.04) !important;
-        border: 1px solid rgba(255,255,255,0.06) !important;
-        backdrop-filter: blur(8px);
-    }
-    .stAlert .st-emotion-cache-1wmy9hl {
-        color: #E8EDF5 !important;
-    }
-
-    /* Footer */
-    .footer {
-        margin-top: 4rem;
-        padding-top: 2rem;
-        border-top: 1px solid rgba(255,255,255,0.06);
-        text-align: center;
-        font-size: 0.85rem;
-        color: #64748B;
-    }
-    .footer span {
-        color: #93C5FD;
-    }
-
-    /* Responsive */
+    .stNumberInput input:focus { border-color: #3B82F6 !important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important; }
+    .stAlert { border-radius: 16px !important; background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.06) !important; backdrop-filter: blur(8px); }
+    .footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.06); text-align: center; font-size: 0.85rem; color: #64748B; }
+    .footer span { color: #93C5FD; }
     @media (max-width: 768px) {
         .main-container { padding: 1rem; }
         .app-title { font-size: 2rem; }
         .app-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
-        .linhbao-wrapper { bottom: 15px; right: 15px; }
-        .linhbao-avatar { width: 60px; height: 60px; font-size: 2.2rem; }
-        .linhbao-bubble { max-width: 140px; font-size: 0.75rem; padding: 8px 12px; }
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Dữ liệu lời thoại ─────────────────────────────────────────────
+# ─── Danh sách câu nói ──────────────────────────────────────────
 LINHBAO_SAYINGS = [
     "Chào tiểu thư! Tôi là Linh Bảo đây! 🐼",
     "Sẵn sàng tìm hành tinh mới chưa? 🚀",
@@ -308,49 +121,125 @@ LINHBAO_SAYINGS = [
     "Hãy nhìn lên bầu trời và mơ ước! 🌌"
 ]
 
-# ─── Hàm hiển thị Linh Bảo (hoàn chỉnh) ──────────────────────
+# ─── Hàm tạo Linh Bảo bằng components.html ─────────────────────
 def show_linhbao():
     sayings_json = json.dumps(LINHBAO_SAYINGS)
-    html = f"""
-    <div class="linhbao-wrapper" id="linhbaoWrapper" onclick="linhBaoSpeak()">
-        <div class="linhbao-bubble" id="linhbaoBubble">Chào tiểu thư! Click vào tôi nhé 🐾</div>
-        <div class="linhbao-avatar" id="linhbaoAvatar">🐼</div>
-    </div>
-    <script>
-        const sayings = {sayings_json};
-        const bubble = document.getElementById('linhbaoBubble');
-        const avatar = document.getElementById('linhbaoAvatar');
-        const wrapper = document.getElementById('linhbaoWrapper');
-
-        function linhBaoSpeak() {{
-            const randomIndex = Math.floor(Math.random() * sayings.length);
-            const msg = sayings[randomIndex];
-            bubble.textContent = msg;
-            avatar.classList.remove('linhbao-speaking');
-            // Force reflow để animation chạy lại
-            void avatar.offsetWidth;
-            avatar.classList.add('linhbao-speaking');
-        }}
-
-        // Lời chào sau 2 giây
-        setTimeout(() => {{
-            bubble.textContent = 'Tiểu thư, tôi là Linh Bảo! Rất vui được đồng hành cùng bạn! 🐼✨';
-        }}, 2000);
-
-        // Hiệu ứng hover hint
-        wrapper.addEventListener('mouseenter', () => {{
-            if (!bubble.textContent.includes('Click')) {{
-                bubble.textContent = '👆 Click vào tôi để trò chuyện!';
-                setTimeout(() => {{
-                    if (bubble.textContent === '👆 Click vào tôi để trò chuyện!') {{
-                        bubble.textContent = sayings[Math.floor(Math.random() * sayings.length)];
-                    }}
-                }}, 1500);
+    
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+                background: transparent;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                font-family: 'Inter', sans-serif;
             }}
-        }});
-    </script>
+            .linhbao-wrapper {{
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                cursor: pointer;
+                user-select: none;
+                transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }}
+            .linhbao-wrapper:hover {{
+                transform: scale(1.05);
+            }}
+            .linhbao-bubble {{
+                background: #1E293B;
+                color: #E8EDF5;
+                padding: 10px 18px;
+                border-radius: 20px 20px 20px 4px;
+                font-size: 0.85rem;
+                max-width: 200px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+                border: 1px solid rgba(255,255,255,0.08);
+                margin-bottom: 10px;
+                backdrop-filter: blur(8px);
+                text-align: center;
+                line-height: 1.4;
+                transition: all 0.3s ease;
+            }}
+            .linhbao-avatar {{
+                width: 72px;
+                height: 72px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 2.8rem;
+                box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+                transition: all 0.3s ease;
+                animation: float 4s ease-in-out infinite;
+                border: 2px solid rgba(255,255,255,0.1);
+            }}
+            .linhbao-avatar:active {{
+                transform: scale(0.92);
+            }}
+            @keyframes float {{
+                0%, 100% {{ transform: translateY(0px); }}
+                50% {{ transform: translateY(-12px); }}
+            }}
+            .linhbao-speaking .linhbao-avatar {{
+                animation: speak 0.5s ease 3;
+            }}
+            @keyframes speak {{
+                0%, 100% {{ transform: scale(1); }}
+                50% {{ transform: scale(1.15) rotate(-5deg); }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="linhbao-wrapper" id="linhbaoWrapper" onclick="linhBaoSpeak()">
+            <div class="linhbao-bubble" id="linhbaoBubble">Chào tiểu thư! Click vào tôi nhé 🐾</div>
+            <div class="linhbao-avatar" id="linhbaoAvatar">🐼</div>
+        </div>
+        <script>
+            const sayings = {sayings_json};
+            const bubble = document.getElementById('linhbaoBubble');
+            const avatar = document.getElementById('linhbaoAvatar');
+            const wrapper = document.getElementById('linhbaoWrapper');
+
+            function linhBaoSpeak() {{
+                const randomIndex = Math.floor(Math.random() * sayings.length);
+                const msg = sayings[randomIndex];
+                bubble.textContent = msg;
+                avatar.classList.remove('linhbao-speaking');
+                // Force reflow để animation chạy lại
+                void avatar.offsetWidth;
+                avatar.classList.add('linhbao-speaking');
+            }}
+
+            // Lời chào sau 2 giây
+            setTimeout(() => {{
+                bubble.textContent = 'Tiểu thư, tôi là Linh Bảo! Rất vui được đồng hành cùng bạn! 🐼✨';
+            }}, 2000);
+
+            // Hiệu ứng hover hint
+            wrapper.addEventListener('mouseenter', () => {{
+                if (!bubble.textContent.includes('Click')) {{
+                    bubble.textContent = '👆 Click vào tôi để trò chuyện!';
+                    setTimeout(() => {{
+                        if (bubble.textContent === '👆 Click vào tôi để trò chuyện!') {{
+                            bubble.textContent = sayings[Math.floor(Math.random() * sayings.length)];
+                        }}
+                    }}, 1500);
+                }}
+            }});
+        </script>
+    </body>
+    </html>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    
+    # Dùng components.html với chiều cao cố định để không chiếm quá nhiều không gian
+    st.components.v1.html(html_code, height=200, scrolling=False)
 
 # ─── Sidebar ──────────────────────────────────────────────────────
 with st.sidebar:
@@ -439,7 +328,6 @@ with tab1:
             st.markdown("#### 📊 Kết quả dự đoán")
             st.dataframe(df_result[['Confidence']], use_container_width=True)
             
-            # Biểu đồ
             fig, ax = plt.subplots(figsize=(8, 4))
             ax.hist(df_result['Confidence'], bins=20, color='#60A5FA', edgecolor='#1E293B', alpha=0.8)
             ax.set_xlabel('Độ tin cậy', color='#94A3B8')
