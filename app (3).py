@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ─── CSS cao cấp ──────────────────────────────────────────────────
+# ─── CSS cao cấp (đã sửa tương phản header) ────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap');
@@ -33,17 +33,31 @@ st.markdown("""
         font-size: 3.8rem;
         font-weight: 900;
         text-align: center;
-        background: linear-gradient(135deg, #00d4ff 0%, #7b2ffc 50%, #ff6fd8 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 40px rgba(0,212,255,0.3);
+        color: #ffffff;  /* <-- MÀU TRẮNG CỐ ĐỊNH, ĐẢM BẢO CONTRAST */
+        text-shadow: 0 0 30px rgba(0,212,255,0.4), 0 0 60px rgba(123,47,252,0.2);
         letter-spacing: 0.05em;
         padding: 1.5rem 0 0.5rem;
         animation: glowPulse 3s ease-in-out infinite;
+        /* Gradient chỉ làm lớp nền mờ, không ảnh hưởng màu chữ */
+        background: linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(123,47,252,0.2) 50%, rgba(255,111,216,0.2) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    /* Lớp phủ trắng để đọc được */
+    .main-header::after {
+        content: "🪐 AstroMine-X Pro";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        color: #ffffff;
+        text-shadow: 0 0 40px rgba(0,212,255,0.6);
+        -webkit-text-fill-color: #ffffff;
+        z-index: -1;
     }
     @keyframes glowPulse {
-        0%, 100% { text-shadow: 0 0 30px rgba(0,212,255,0.3); }
-        50% { text-shadow: 0 0 60px rgba(123,47,252,0.5); }
+        0%, 100% { text-shadow: 0 0 30px rgba(0,212,255,0.4); }
+        50% { text-shadow: 0 0 60px rgba(123,47,252,0.6); }
     }
     .sub-header {
         font-family: 'Inter', sans-serif;
@@ -193,10 +207,33 @@ st.markdown("""
         .main-header { font-size: 2.4rem; }
         .card { padding: 1.2rem; }
     }
+
+    /* Nút tắt Linh Bảo (được gắn vào wrapper) */
+    .linhbao-toggle-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 100000;
+        background: rgba(20,30,50,0.8);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(0,212,255,0.2);
+        border-radius: 30px;
+        padding: 8px 16px;
+        color: #64ffda;
+        font-size: 0.8rem;
+        cursor: pointer;
+        user-select: none;
+        transition: 0.2s;
+        font-family: 'Inter', sans-serif;
+        pointer-events: auto;
+    }
+    .linhbao-toggle-btn:hover {
+        background: rgba(0,212,255,0.15);
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Linh Bảo bay nhảy ────────────────────────────────────────────
+# ─── Linh Bảo (phiên bản mới – góc dưới phải, có nút tắt) ─────
 LINHBAO_SAYINGS = [
     "Chào tiểu thư! Em là Linh Bảo đây! 🐼",
     "Sẵn sàng săn hành tinh chưa? 🚀",
@@ -212,8 +249,15 @@ LINHBAO_SAYINGS = [
     "Hãy luôn mơ ước, tiểu thư! 🌌"
 ]
 
+# State cho Linh Bảo (ẩn/hiện)
+if 'linhbao_visible' not in st.session_state:
+    st.session_state.linhbao_visible = True
+
 def show_linhbao():
     sayings_json = json.dumps(LINHBAO_SAYINGS)
+    visible = st.session_state.linhbao_visible
+    display_style = "display: flex;" if visible else "display: none;"
+    
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -230,8 +274,8 @@ def show_linhbao():
         }}
         .wrapper {{
             position: fixed;
-            top: 50px;
-            left: 50px;
+            right: 30px;
+            bottom: 100px;
             pointer-events: auto;
             cursor: pointer;
             display: flex;
@@ -240,40 +284,41 @@ def show_linhbao():
             transition: all 0.1s linear;
             user-select: none;
             z-index: 99999;
+            {display_style}
         }}
         .wrapper:hover {{ transform: scale(1.05); }}
         .bubble {{
             background: rgba(20,30,50,0.85);
             backdrop-filter: blur(12px);
             color: #e6f1ff;
-            padding: 8px 14px;
+            padding: 6px 12px;
             border-radius: 20px 20px 20px 4px;
-            font-size: 0.75rem;
-            max-width: 150px;
+            font-size: 0.7rem;
+            max-width: 120px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.6);
             border: 1px solid rgba(0,212,255,0.15);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             text-align: center;
             line-height: 1.3;
             transition: all 0.3s;
             white-space: nowrap;
         }}
         .avatar {{
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             background: linear-gradient(135deg, #00d4ff, #7b2ffc);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.2rem;
+            font-size: 1.8rem;
             box-shadow: 0 8px 32px rgba(0,212,255,0.3);
             animation: float 4s ease-in-out infinite;
             border: 2px solid rgba(255,255,255,0.1);
         }}
         @keyframes float {{
             0%, 100% {{ transform: translateY(0); }}
-            50% {{ transform: translateY(-8px); }}
+            50% {{ transform: translateY(-6px); }}
         }}
         .speaking .avatar {{
             animation: speak 0.5s ease 3;
@@ -287,8 +332,8 @@ def show_linhbao():
         }}
         @keyframes bounce {{
             0% {{ transform: scale(1); }}
-            30% {{ transform: scale(1.3) rotate(10deg); }}
-            60% {{ transform: scale(0.9) rotate(-5deg); }}
+            30% {{ transform: scale(1.2) rotate(8deg); }}
+            60% {{ transform: scale(0.9) rotate(-3deg); }}
             100% {{ transform: scale(1); }}
         }}
     </style>
@@ -304,31 +349,19 @@ def show_linhbao():
         const bubble = document.getElementById('bubble');
         const avatar = document.getElementById('avatar');
 
-        let vx = 1.2, vy = 0.8;
-        let x = 50, y = 50;
-        let lastBubbleText = '';
+        // Di chuyển nhẹ nhàng, chủ yếu xoay quanh góc phải
+        let angle = 0;
+        const radiusX = 20;
+        const radiusY = 15;
+        const centerX = window.innerWidth - 80;
+        const centerY = window.innerHeight - 150;
 
         function move() {{
-            const w = window.innerWidth - 120;
-            const h = window.innerHeight - 160;
-
-            x += vx; y += vy;
-
-            if (x > w) {{ x = w; vx = -vx; bounceEffect(); sayRandom(); }}
-            if (x < 0) {{ x = 0; vx = -vx; bounceEffect(); sayRandom(); }}
-            if (y > h) {{ y = h; vy = -vy; bounceEffect(); sayRandom(); }}
-            if (y < 0) {{ y = 0; vy = -vy; bounceEffect(); sayRandom(); }}
-
+            angle += 0.02;
+            const x = centerX + Math.sin(angle) * radiusX;
+            const y = centerY + Math.cos(angle) * radiusY;
             wrapper.style.left = x + 'px';
             wrapper.style.top = y + 'px';
-
-            if (Math.random() < 0.005) {{
-                vx += (Math.random() - 0.5) * 0.8;
-                vy += (Math.random() - 0.5) * 0.8;
-                const sp = Math.sqrt(vx*vx + vy*vy);
-                if (sp > 2.5) {{ vx = (vx/sp)*2.5; vy = (vy/sp)*2.5; }}
-                if (sp < 0.6) {{ vx = (vx/sp)*0.8 || 1.2; vy = (vy/sp)*0.8 || 0.8; }}
-            }}
         }}
 
         function bounceEffect() {{
@@ -339,62 +372,70 @@ def show_linhbao():
         function sayRandom() {{
             const idx = Math.floor(Math.random() * sayings.length);
             const msg = sayings[idx];
-            if (msg !== lastBubbleText) {{
-                bubble.textContent = msg;
-                lastBubbleText = msg;
-            }}
+            bubble.textContent = msg;
             avatar.classList.remove('speaking');
             void avatar.offsetWidth;
             avatar.classList.add('speaking');
+            bounceEffect();
         }}
 
         function say() {{
             const idx = Math.floor(Math.random() * sayings.length);
             const msg = sayings[idx];
             bubble.textContent = msg;
-            lastBubbleText = msg;
             avatar.classList.remove('speaking');
             void avatar.offsetWidth;
             avatar.classList.add('speaking');
-            vx = (Math.random() - 0.5) * 4;
-            vy = (Math.random() - 0.5) * 4;
+            bounceEffect();
+            // Đổi hướng nhẹ
+            angle += 0.5;
         }}
 
+        // Lời chào ban đầu
         setTimeout(() => {{
-            bubble.textContent = 'Tiểu thư, em đang bay đây! 🌟';
-            lastBubbleText = 'Tiểu thư, em đang bay đây! 🌟';
+            bubble.textContent = 'Tiểu thư, em đây! 🌟';
         }}, 1500);
 
-        setInterval(move, 30);
+        // Cập nhật vị trí mỗi 50ms (20fps)
+        setInterval(move, 50);
 
+        // Mỗi 10 giây tự động nói (chỉ khi không có hover)
+        let idleTimer = setInterval(() => {{
+            if (!wrapper.matches(':hover')) {{
+                sayRandom();
+            }}
+        }}, 10000);
+
+        // Hover hint
         wrapper.addEventListener('mouseenter', () => {{
             if (!bubble.textContent.includes('Click')) {{
                 const old = bubble.textContent;
-                bubble.textContent = '👆 Click để trò chuyện!';
+                bubble.textContent = '👆 Click!';
                 setTimeout(() => {{
-                    if (bubble.textContent === '👆 Click để trò chuyện!') {{
+                    if (bubble.textContent === '👆 Click!') {{
                         bubble.textContent = sayings[Math.floor(Math.random() * sayings.length)];
                     }}
-                }}, 1200);
+                }}, 1000);
             }}
         }});
 
-        avatar.addEventListener('click', (e) => {{
-            e.stopPropagation();
-            say();
-        }});
-
-        console.log('🐼 Linh Bảo đã sẵn sàng bay nhảy!');
+        console.log('🐼 Linh Bảo đã sẵn sàng!');
     </script>
     </body>
     </html>
     """
     st.components.v1.html(html, height=0, scrolling=False)
 
-# ─── Load model (sửa lỗi) ────────────────────────────────────────
+# ─── Nút toggle Linh Bảo (giao diện) ────────────────────────────
+col_btn1, col_btn2, col_btn3 = st.columns([10, 1, 1])
+with col_btn2:
+    if st.button("🐼" if st.session_state.linhbao_visible else "🐼💤", key="toggle_linhbao"):
+        st.session_state.linhbao_visible = not st.session_state.linhbao_visible
+        st.rerun()
+
+# ─── Load model ────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    # Tìm file model ở nhiều đường dẫn
     possible_paths = [
         "planet_model_lgb_fixed.pkl",
         "./planet_model_lgb_fixed.pkl",
@@ -403,18 +444,16 @@ def load_model():
         "/mount/src/astromine-x/planet_model_lgb_fixed.pkl",
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "planet_model_lgb_fixed.pkl")
     ]
-    
     model_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            model_path = path
+    for p in possible_paths:
+        if os.path.exists(p):
+            model_path = p
             break
-    
     if model_path is None:
         st.error("❌ Không tìm thấy file model!")
         st.info(f"📂 Thư mục hiện tại: {os.getcwd()}")
-        st.info(f"📂 Các file trong thư mục: {', '.join(os.listdir('.')) if os.path.exists('.') else 'Không thể đọc'}")
-        # Tạo model giả từ numpy (không cần sklearn)
+        st.info(f"📂 Các file: {', '.join(os.listdir('.')) if os.path.exists('.') else 'Không đọc được'}")
+        # Fallback model (nếu có sklearn)
         try:
             from sklearn.ensemble import RandomForestClassifier
             from sklearn.preprocessing import StandardScaler
@@ -425,12 +464,11 @@ def load_model():
             model_fake.fit(X_fake, y_fake)
             scaler_fake = StandardScaler()
             scaler_fake.fit(X_fake)
-            st.warning("⚠️ Đang sử dụng model dự phòng (độ chính xác thấp, chỉ để demo).")
+            st.warning("⚠️ Dùng model dự phòng (demo).")
             return model_fake, scaler_fake
         except:
-            st.error("❌ Không thể tạo model dự phòng. Vui lòng cài 'scikit-learn'.")
+            st.error("❌ Không tạo được model dự phòng. Cài scikit-learn.")
             return None, None
-    
     try:
         scaler_path = model_path.replace("planet_model_lgb_fixed.pkl", "scaler_lgb_fixed.pkl")
         model = joblib.load(model_path)
@@ -444,7 +482,7 @@ model, scaler = load_model()
 if model is None:
     st.stop()
 
-# ─── Khởi tạo session_state an toàn ─────────────────────────────
+# ─── Khởi tạo session_state ──────────────────────────────────────
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
@@ -457,6 +495,8 @@ if 'history' not in st.session_state:
     st.session_state.history = []
 if 'paste_default' not in st.session_state:
     st.session_state.paste_default = ""
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = 0
 
 RANKING_FILE = "rankings.json"
 def load_rankings():
@@ -471,7 +511,7 @@ def save_rankings(r):
 if not st.session_state.rankings:
     st.session_state.rankings = load_rankings()
 
-# ─── Sidebar ────────────────────────────────────────────────────
+# ─── Sidebar ──────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
     <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1.5rem;">
@@ -490,7 +530,7 @@ with st.sidebar:
                     st.session_state.rankings[st.session_state.username] = 0
                     save_rankings(st.session_state.rankings)
                 st.success(f"✅ Chào {st.session_state.username}!")
-                st.rerun()
+                # KHÔNG dùng st.rerun() – state sẽ tự cập nhật
             else:
                 st.warning("Vui lòng nhập tên!")
     else:
@@ -499,7 +539,7 @@ with st.sidebar:
         if st.button("Đăng xuất", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.username = ""
-            st.rerun()
+            # Không rerun
     st.markdown("---")
     st.markdown('<div class="sidebar-title">📖 Hướng dẫn</div>', unsafe_allow_html=True)
     st.markdown("""
@@ -510,11 +550,11 @@ with st.sidebar:
         3️⃣ NASA (có fallback)<br><br>
         <strong>Độ chính xác:</strong> 85.56%<br>
         <strong>Mô hình:</strong> LightGBM<br><br>
-        <span style="color:#64ffda;">🐼 Linh Bảo đang bay nhảy quanh màn hình!</span>
+        <span style="color:#64ffda;">🐼 Linh Bảo ở góc dưới phải – nhấn nút để tắt/mở.</span>
     </div>
     """, unsafe_allow_html=True)
 
-# ─── Hiển thị Linh Bảo ─────────────────────────────────────────
+# ─── Hiển thị Linh Bảo ──────────────────────────────────────────
 show_linhbao()
 
 # ─── Header ──────────────────────────────────────────────────────
@@ -524,7 +564,6 @@ st.markdown('<div class="sub-header">✨ Khám phá ngoại hành tinh với AI 
 # ─── Hàm phân tích ──────────────────────────────────────────────
 def analyze_data(df, show_chart=True, update_score=True):
     feature_cols = ['pl_orbper', 'pl_radj', 'pl_bmasse', 'pl_orbincl', 'st_teff', 'st_logg']
-    # Đổi tên cột nếu có
     for col in df.columns:
         if col.lower() in ['pl_bmassj', 'pl_bmass'] and 'pl_bmasse' not in df.columns:
             df = df.rename(columns={col: 'pl_bmasse'})
@@ -541,7 +580,7 @@ def analyze_data(df, show_chart=True, update_score=True):
     df_result['Prediction'] = (proba > 0.5).astype(int)
     n_planets = int((proba > 0.5).sum())
     st.subheader(f"📊 Kết quả – {len(df_result)} ứng viên, {n_planets} hành tinh tiềm năng")
-    st.dataframe(df_result[['Confidence', 'Prediction']], use_container_width=True)
+    st.dataframe(df_result[['Confidence', 'Prediction']], use_container_width=True, height=400)
     if show_chart:
         fig = px.histogram(df_result, x='Confidence', nbins=30,
                            title='Phân bố độ tin cậy',
@@ -568,12 +607,13 @@ def analyze_data(df, show_chart=True, update_score=True):
     })
     return df_result
 
-# ─── Tabs ────────────────────────────────────────────────────────
+# ─── Tabs ──────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📝 Dán CSV", "📂 Tải CSV", "🌐 NASA",
     "🎯 Dự đoán nhanh", "📊 Thống kê", "🏆 Bảng xếp hạng"
 ])
 
+# ─── Nội dung các tab ────────────────────────────────────────────
 with tab1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title"><span class="icon">📝</span> Dán dữ liệu</div>', unsafe_allow_html=True)
@@ -606,7 +646,7 @@ with tab2:
     uploaded = st.file_uploader("Chọn file CSV", type=['csv'])
     if uploaded is not None:
         df = pd.read_csv(uploaded)
-        st.dataframe(df.head())
+        st.dataframe(df.head(), use_container_width=True, height=400)
         if st.button("🔍 Phân tích", key="btn_csv"):
             analyze_data(df)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -626,7 +666,7 @@ with tab3:
                         df = pd.read_csv(StringIO(r.text))
                         st.session_state.nasa_data = df
                         st.success(f"✅ Đã tải {len(df)} ứng viên!")
-                        st.dataframe(df.head())
+                        st.dataframe(df.head(), use_container_width=True, height=400)
                     else:
                         st.error(f"HTTP {r.status_code}: {r.text[:200]}")
                 except Exception as e:
@@ -642,7 +682,7 @@ with tab3:
             df = pd.read_csv(StringIO(sample))
             st.session_state.nasa_data = df
             st.success("✅ Đã tải mẫu (5 ứng viên)!")
-            st.dataframe(df.head())
+            st.dataframe(df.head(), use_container_width=True, height=400)
     if st.session_state.nasa_data is not None:
         if st.button("🔍 Phân tích NASA"):
             analyze_data(st.session_state.nasa_data)
@@ -690,7 +730,7 @@ with tab5:
     st.markdown('<div class="card-title"><span class="icon">📊</span> Thống kê</div>', unsafe_allow_html=True)
     if st.session_state.history:
         dfh = pd.DataFrame(st.session_state.history)
-        st.dataframe(dfh)
+        st.dataframe(dfh, use_container_width=True, height=400)
         fig = px.line(dfh, x='time', y='n_planets', title='Số hành tinh theo thời gian')
         fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#a8b2d1')
         st.plotly_chart(fig, use_container_width=True)
@@ -708,7 +748,7 @@ with tab6:
         dfr.index.name = 'Hạng'
         if st.session_state.logged_in:
             dfr[''] = dfr['Người dùng'].apply(lambda x: '⭐' if x == st.session_state.username else '')
-        st.dataframe(dfr)
+        st.dataframe(dfr, use_container_width=True, height=400)
         if len(sorted_rank) > 1:
             top = sorted_rank[:10]
             fig = px.bar(x=[u[0] for u in top], y=[u[1] for u in top], title='Top 10')
@@ -721,7 +761,7 @@ with tab6:
 # ─── Footer ──────────────────────────────────────────────────────
 st.markdown("""
 <div class="footer">
-    🚀 AstroMine-X Pro · v3.3 · Phát triển với ❤️ và Linh Bảo 🐼<br>
+    🚀 AstroMine-X Pro · v3.4 · Phát triển với ❤️ và Linh Bảo 🐼<br>
     Dữ liệu từ NASA Exoplanet Archive · © 2026
 </div>
 """, unsafe_allow_html=True)
