@@ -2,6 +2,6 @@ streamlit
 pandas
 numpy
 joblib
-matplotlib
-plotly
 requests
+plotly
+scikit-learn
