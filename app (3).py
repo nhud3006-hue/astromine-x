@@ -196,7 +196,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Linh Bảo ────────────────────────────────────────────────────
+# ─── Linh Bảo bay nhảy ────────────────────────────────────────────
 LINHBAO_SAYINGS = [
     "Chào tiểu thư! Em là Linh Bảo đây! 🐼",
     "Sẵn sàng săn hành tinh chưa? 🚀",
@@ -241,9 +241,7 @@ def show_linhbao():
             user-select: none;
             z-index: 99999;
         }}
-        .wrapper:hover {{
-            transform: scale(1.05);
-        }}
+        .wrapper:hover {{ transform: scale(1.05); }}
         .bubble {{
             background: rgba(20,30,50,0.85);
             backdrop-filter: blur(12px);
@@ -306,18 +304,15 @@ def show_linhbao():
         const bubble = document.getElementById('bubble');
         const avatar = document.getElementById('avatar');
 
-        let vx = 1.2;
-        let vy = 0.8;
-        let x = 50;
-        let y = 50;
+        let vx = 1.2, vy = 0.8;
+        let x = 50, y = 50;
         let lastBubbleText = '';
 
         function move() {{
             const w = window.innerWidth - 120;
             const h = window.innerHeight - 160;
 
-            x += vx;
-            y += vy;
+            x += vx; y += vy;
 
             if (x > w) {{ x = w; vx = -vx; bounceEffect(); sayRandom(); }}
             if (x < 0) {{ x = 0; vx = -vx; bounceEffect(); sayRandom(); }}
@@ -330,16 +325,9 @@ def show_linhbao():
             if (Math.random() < 0.005) {{
                 vx += (Math.random() - 0.5) * 0.8;
                 vy += (Math.random() - 0.5) * 0.8;
-                const maxSpeed = 2.5;
                 const sp = Math.sqrt(vx*vx + vy*vy);
-                if (sp > maxSpeed) {{
-                    vx = (vx/sp) * maxSpeed;
-                    vy = (vy/sp) * maxSpeed;
-                }}
-                if (sp < 0.6) {{
-                    vx = (vx/sp) * 0.8 || 1.2;
-                    vy = (vy/sp) * 0.8 || 0.8;
-                }}
+                if (sp > 2.5) {{ vx = (vx/sp)*2.5; vy = (vy/sp)*2.5; }}
+                if (sp < 0.6) {{ vx = (vx/sp)*0.8 || 1.2; vy = (vy/sp)*0.8 || 0.8; }}
             }}
         }}
 
@@ -403,13 +391,50 @@ def show_linhbao():
     """
     st.components.v1.html(html, height=0, scrolling=False)
 
-# ─── Load model (đã sửa lỗi đường dẫn) ─────────────────────────
+# ─── Load model (sửa lỗi) ────────────────────────────────────────
 @st.cache_resource
 def load_model():
+    # Tìm file model ở nhiều đường dẫn
+    possible_paths = [
+        "planet_model_lgb_fixed.pkl",
+        "./planet_model_lgb_fixed.pkl",
+        "../planet_model_lgb_fixed.pkl",
+        "models/planet_model_lgb_fixed.pkl",
+        "/mount/src/astromine-x/planet_model_lgb_fixed.pkl",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "planet_model_lgb_fixed.pkl")
+    ]
+    
+    model_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            model_path = path
+            break
+    
+    if model_path is None:
+        st.error("❌ Không tìm thấy file model!")
+        st.info(f"📂 Thư mục hiện tại: {os.getcwd()}")
+        st.info(f"📂 Các file trong thư mục: {', '.join(os.listdir('.')) if os.path.exists('.') else 'Không thể đọc'}")
+        # Tạo model giả từ numpy (không cần sklearn)
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.preprocessing import StandardScaler
+            np.random.seed(42)
+            X_fake = np.random.randn(1000, 6)
+            y_fake = (np.random.rand(1000) < 0.3).astype(int)
+            model_fake = RandomForestClassifier(n_estimators=50, random_state=42)
+            model_fake.fit(X_fake, y_fake)
+            scaler_fake = StandardScaler()
+            scaler_fake.fit(X_fake)
+            st.warning("⚠️ Đang sử dụng model dự phòng (độ chính xác thấp, chỉ để demo).")
+            return model_fake, scaler_fake
+        except:
+            st.error("❌ Không thể tạo model dự phòng. Vui lòng cài 'scikit-learn'.")
+            return None, None
+    
     try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        model = joblib.load(os.path.join(base_dir, "planet_model_lgb_fixed.pkl"))
-        scaler = joblib.load(os.path.join(base_dir, "scaler_lgb_fixed.pkl"))
+        scaler_path = model_path.replace("planet_model_lgb_fixed.pkl", "scaler_lgb_fixed.pkl")
+        model = joblib.load(model_path)
+        scaler = joblib.load(scaler_path)
         return model, scaler
     except Exception as e:
         st.error(f"❌ Lỗi load model: {e}")
@@ -419,32 +444,32 @@ model, scaler = load_model()
 if model is None:
     st.stop()
 
-# ─── Hàm lưu / tải bảng xếp hạng ──────────────────────────────
-RANKING_FILE = "rankings.json"
-
-def load_rankings():
-    if os.path.exists(RANKING_FILE):
-        with open(RANKING_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
-
-def save_rankings(rankings):
-    with open(RANKING_FILE, 'w', encoding='utf-8') as f:
-        json.dump(rankings, f, indent=2, ensure_ascii=False)
-
-# ─── KHỞI TẠO SESSION_STATE AN TOÀN ─────────────────────────────
+# ─── Khởi tạo session_state an toàn ─────────────────────────────
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
     st.session_state.username = ""
 if 'rankings' not in st.session_state:
-    st.session_state.rankings = load_rankings()
+    st.session_state.rankings = {}
 if 'nasa_data' not in st.session_state:
     st.session_state.nasa_data = None
 if 'history' not in st.session_state:
     st.session_state.history = []
 if 'paste_default' not in st.session_state:
     st.session_state.paste_default = ""
+
+RANKING_FILE = "rankings.json"
+def load_rankings():
+    if os.path.exists(RANKING_FILE):
+        with open(RANKING_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+def save_rankings(r):
+    with open(RANKING_FILE, 'w', encoding='utf-8') as f:
+        json.dump(r, f, indent=2, ensure_ascii=False)
+
+if not st.session_state.rankings:
+    st.session_state.rankings = load_rankings()
 
 # ─── Sidebar ────────────────────────────────────────────────────
 with st.sidebar:
@@ -454,10 +479,9 @@ with st.sidebar:
         <span style="font-family:'Orbitron',sans-serif; font-size:1.1rem; font-weight:700; color:#64ffda;">AstroMine-X</span>
     </div>
     """, unsafe_allow_html=True)
-    
     st.markdown('<div class="sidebar-title">🔐 Tài khoản</div>', unsafe_allow_html=True)
     if not st.session_state.logged_in:
-        username = st.text_input("Tên", placeholder="Nhập tên của bạn", key="login_name")
+        username = st.text_input("Tên", placeholder="Nhập tên", key="login_name")
         if st.button("🚀 Đăng nhập / Đăng ký", use_container_width=True):
             if username.strip():
                 st.session_state.username = username.strip()
@@ -476,7 +500,6 @@ with st.sidebar:
             st.session_state.logged_in = False
             st.session_state.username = ""
             st.rerun()
-    
     st.markdown("---")
     st.markdown('<div class="sidebar-title">📖 Hướng dẫn</div>', unsafe_allow_html=True)
     st.markdown("""
@@ -484,37 +507,31 @@ with st.sidebar:
         <strong>3 cách nhập:</strong><br>
         1️⃣ Dán CSV<br>
         2️⃣ Tải CSV<br>
-        3️⃣ NASA (có fallback)
-        <br><br>
+        3️⃣ NASA (có fallback)<br><br>
         <strong>Độ chính xác:</strong> 85.56%<br>
-        <strong>Mô hình:</strong> LightGBM
-        <br><br>
-        <span style="color:#64ffda;">💡 Kéo thanh trượt ở tab "Dự đoán nhanh" để thử ngay.</span>
+        <strong>Mô hình:</strong> LightGBM<br><br>
+        <span style="color:#64ffda;">🐼 Linh Bảo đang bay nhảy quanh màn hình!</span>
     </div>
     """, unsafe_allow_html=True)
 
 # ─── Hiển thị Linh Bảo ─────────────────────────────────────────
 show_linhbao()
 
-# ─── Header chính ──────────────────────────────────────────────
+# ─── Header ──────────────────────────────────────────────────────
 st.markdown('<div class="main-header">🪐 AstroMine-X Pro</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">✨ Khám phá ngoại hành tinh với AI • Dữ liệu TESS • Linh Bảo 🐼</div>', unsafe_allow_html=True)
 
-# ─── Hàm phân tích chung ──────────────────────────────────────
+# ─── Hàm phân tích ──────────────────────────────────────────────
 def analyze_data(df, show_chart=True, update_score=True):
     feature_cols = ['pl_orbper', 'pl_radj', 'pl_bmasse', 'pl_orbincl', 'st_teff', 'st_logg']
-    rename_map = {}
+    # Đổi tên cột nếu có
     for col in df.columns:
         if col.lower() in ['pl_bmassj', 'pl_bmass'] and 'pl_bmasse' not in df.columns:
-            rename_map[col] = 'pl_bmasse'
-    if rename_map:
-        df = df.rename(columns=rename_map)
-    
+            df = df.rename(columns={col: 'pl_bmasse'})
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
-        st.error(f"❌ Thiếu các cột: {missing}. Vui lòng kiểm tra dữ liệu.")
+        st.error(f"❌ Thiếu cột: {missing}")
         return None
-    
     X = df[feature_cols].copy()
     X = X.fillna(X.mean())
     X_scaled = scaler.transform(X)
@@ -523,75 +540,55 @@ def analyze_data(df, show_chart=True, update_score=True):
     df_result['Confidence'] = np.round(proba, 3)
     df_result['Prediction'] = (proba > 0.5).astype(int)
     n_planets = int((proba > 0.5).sum())
-    
     st.subheader(f"📊 Kết quả – {len(df_result)} ứng viên, {n_planets} hành tinh tiềm năng")
     st.dataframe(df_result[['Confidence', 'Prediction']], use_container_width=True)
-    
     if show_chart:
-        fig = px.histogram(
-            df_result, x='Confidence', nbins=30,
-            title='Phân bố độ tin cậy',
-            color_discrete_sequence=['#00d4ff'],
-            labels={'Confidence': 'Độ tin cậy', 'count': 'Số lượng'}
-        )
-        fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font_color='#a8b2d1',
-            showlegend=False,
-            margin=dict(l=20, r=20, t=40, b=20),
-            height=350
-        )
+        fig = px.histogram(df_result, x='Confidence', nbins=30,
+                           title='Phân bố độ tin cậy',
+                           color_discrete_sequence=['#00d4ff'],
+                           labels={'Confidence': 'Độ tin cậy', 'count': 'Số lượng'})
+        fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                          font_color='#a8b2d1', showlegend=False, margin=dict(l=20,r=20,t=40,b=20), height=350)
         fig.update_xaxes(gridcolor='rgba(255,255,255,0.05)')
         fig.update_yaxes(gridcolor='rgba(255,255,255,0.05)')
         st.plotly_chart(fig, use_container_width=True)
-    
     if update_score and st.session_state.logged_in:
-        current_score = st.session_state.rankings.get(st.session_state.username, 0)
-        if n_planets > current_score:
+        cur = st.session_state.rankings.get(st.session_state.username, 0)
+        if n_planets > cur:
             st.session_state.rankings[st.session_state.username] = n_planets
             save_rankings(st.session_state.rankings)
             st.success(f"🎉 Cập nhật điểm: {n_planets} hành tinh (kỷ lục mới!)")
         else:
-            st.info(f"📌 Điểm hiện tại: {current_score} – lần này tìm được {n_planets} hành tinh.")
-    
-    history = st.session_state.history
-    history.append({
+            st.info(f"📌 Điểm: {cur} – lần này: {n_planets} hành tinh")
+    st.session_state.history.append({
         'time': datetime.now().strftime("%H:%M:%S"),
         'n_candidates': len(df_result),
         'n_planets': n_planets,
         'user': st.session_state.username if st.session_state.logged_in else 'Anonymous'
     })
-    st.session_state.history = history
     return df_result
 
-# ─── Các tab ────────────────────────────────────────────────────
+# ─── Tabs ────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "📝 Dán CSV",
-    "📂 Tải CSV",
-    "🌐 NASA",
-    "🎯 Dự đoán nhanh",
-    "📊 Thống kê",
-    "🏆 Bảng xếp hạng"
+    "📝 Dán CSV", "📂 Tải CSV", "🌐 NASA",
+    "🎯 Dự đoán nhanh", "📊 Thống kê", "🏆 Bảng xếp hạng"
 ])
 
-# ─── Tab 1: Dán ─────────────────────────────────────────────────
 with tab1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="icon">📝</span> Dán trực tiếp dữ liệu</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="icon">📝</span> Dán dữ liệu</div>', unsafe_allow_html=True)
     example = """pl_orbper,pl_radj,pl_bmasse,pl_orbincl,st_teff,st_logg
 1.17,1.187,2.36,89.9,5613.0,4.200
 3.23,1.169,1.89,88.93,5647.0,4.236
 5.47,0.987,0.56,89.95,5626.0,4.100
 0.82,0.456,0.12,88.50,5780.0,4.500
 2.15,0.789,0.45,87.50,5500.0,4.100"""
-    with st.expander("📋 Lấy dữ liệu mẫu"):
+    with st.expander("📋 Lấy mẫu"):
         st.code(example, language="text")
-        if st.button("📥 Điền mẫu", key="sample_paste"):
+        if st.button("📥 Điền mẫu"):
             st.session_state.paste_default = example
             st.rerun()
-    default_text = st.session_state.get('paste_default', '')
-    pasted = st.text_area("✏️ Dán dữ liệu (CSV, dấu phẩy hoặc tab)", value=default_text, height=200)
+    pasted = st.text_area("✏️ Dán dữ liệu", value=st.session_state.paste_default, height=200)
     if st.button("🔍 Phân tích", key="btn_paste"):
         if pasted.strip():
             try:
@@ -603,167 +600,128 @@ with tab1:
             st.warning("Vui lòng dán dữ liệu!")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── Tab 2: Tải CSV ────────────────────────────────────────────
 with tab2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="icon">📂</span> Tải file CSV</div>', unsafe_allow_html=True)
-    uploaded = st.file_uploader("Chọn file CSV (6 cột)", type=['csv'])
+    st.markdown('<div class="card-title"><span class="icon">📂</span> Tải CSV</div>', unsafe_allow_html=True)
+    uploaded = st.file_uploader("Chọn file CSV", type=['csv'])
     if uploaded is not None:
         df = pd.read_csv(uploaded)
-        st.dataframe(df.head(), use_container_width=True)
+        st.dataframe(df.head())
         if st.button("🔍 Phân tích", key="btn_csv"):
             analyze_data(df)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── Tab 3: NASA ──────────────────────────────────────────────────
 with tab3:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="icon">🌐</span> Tải dữ liệu từ NASA</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div style="background:rgba(0,212,255,0.05); border-radius:12px; padding:0.8rem 1.2rem; margin-bottom:1rem; border-left:3px solid #00d4ff;">
-        📡 Tải dữ liệu ứng viên hành tinh mới nhất từ <b>NASA Exoplanet Archive</b>.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([3, 1])
+    st.markdown('<div class="card-title"><span class="icon">🌐</span> NASA</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns([3,1])
     with col1:
-        if st.button("📥 Tải dữ liệu NASA", key="btn_nasa"):
-            with st.spinner("Đang kết nối NASA..."):
+        if st.button("📥 Tải từ NASA"):
+            with st.spinner("Đang kết nối..."):
                 try:
                     url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
-                    params = {
-                        "query": "SELECT pl_orbper, pl_radj, pl_bmassj, pl_orbincl, st_teff, st_logg FROM ps",
-                        "format": "csv"
-                    }
-                    response = requests.get(url, params=params, timeout=30)
-                    if response.status_code == 200:
-                        df_nasa = pd.read_csv(StringIO(response.text))
-                        st.session_state.nasa_data = df_nasa
-                        st.success(f"✅ Đã tải {len(df_nasa)} ứng viên!")
-                        st.dataframe(df_nasa.head(), use_container_width=True)
+                    params = {"query": "SELECT pl_orbper,pl_radj,pl_bmassj,pl_orbincl,st_teff,st_logg FROM ps", "format": "csv"}
+                    r = requests.get(url, params=params, timeout=30)
+                    if r.status_code == 200:
+                        df = pd.read_csv(StringIO(r.text))
+                        st.session_state.nasa_data = df
+                        st.success(f"✅ Đã tải {len(df)} ứng viên!")
+                        st.dataframe(df.head())
                     else:
-                        st.error(f"❌ HTTP {response.status_code}: {response.text[:200]}")
-                        st.info("💡 Sử dụng dữ liệu mẫu bên dưới.")
+                        st.error(f"HTTP {r.status_code}: {r.text[:200]}")
                 except Exception as e:
-                    st.error(f"❌ Lỗi: {e}")
-                    st.info("💡 Sử dụng dữ liệu mẫu bên dưới.")
-    
+                    st.error(f"Lỗi: {e}")
     with col2:
-        if st.button("📦 Dữ liệu mẫu", key="sample_nasa"):
+        if st.button("📦 Mẫu"):
             sample = """pl_orbper,pl_radj,pl_bmassj,pl_orbincl,st_teff,st_logg
 1.17,1.187,2.36,89.9,5613.0,4.200
 3.23,1.169,1.89,88.93,5647.0,4.236
 5.47,0.987,0.56,89.95,5626.0,4.100
 0.82,0.456,0.12,88.50,5780.0,4.500
 2.15,0.789,0.45,87.50,5500.0,4.100"""
-            df_sample = pd.read_csv(StringIO(sample))
-            st.session_state.nasa_data = df_sample
+            df = pd.read_csv(StringIO(sample))
+            st.session_state.nasa_data = df
             st.success("✅ Đã tải mẫu (5 ứng viên)!")
-            st.dataframe(df_sample.head(), use_container_width=True)
-    
+            st.dataframe(df.head())
     if st.session_state.nasa_data is not None:
-        if st.button("🔍 Phân tích dữ liệu NASA", key="btn_analyze_nasa"):
+        if st.button("🔍 Phân tích NASA"):
             analyze_data(st.session_state.nasa_data)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── Tab 4: Dự đoán nhanh ──────────────────────────────────────
 with tab4:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="icon">🎯</span> Dự đoán nhanh – Kéo thanh trượt</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        orbper = st.slider('🔄 Chu kỳ (ngày)', 0.1, 50.0, 5.0, 0.1)
-        radj = st.slider('📏 Bán kính (Rjup)', 0.1, 5.0, 1.2, 0.01)
-        bmasse = st.slider('⚖️ Khối lượng (Mjup)', 0.01, 20.0, 2.5, 0.01)
-    with col2:
-        orbincl = st.slider('📐 Độ nghiêng (độ)', 10, 90, 85, 1)
-        st_teff = st.slider('🌡️ Nhiệt độ sao (K)', 3000, 8000, 5500, 100)
-        st_logg = st.slider('📊 log(g) (cm/s²)', 3.0, 5.5, 4.2, 0.01)
-    
-    if st.button("🔮 Dự đoán", key="btn_slider"):
-        input_data = np.array([[orbper, radj, bmasse, orbincl, st_teff, st_logg]])
-        input_scaled = scaler.transform(input_data)
-        proba = model.predict_proba(input_scaled)[0][1]
-        st.markdown("### Kết quả")
+    st.markdown('<div class="card-title"><span class="icon">🎯</span> Dự đoán nhanh</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        orbper = st.slider('🔄 Chu kỳ', 0.1, 50.0, 5.0, 0.1)
+        radj = st.slider('📏 Bán kính', 0.1, 5.0, 1.2, 0.01)
+        bmasse = st.slider('⚖️ Khối lượng', 0.01, 20.0, 2.5, 0.01)
+    with c2:
+        orbincl = st.slider('📐 Độ nghiêng', 10, 90, 85, 1)
+        st_teff = st.slider('🌡️ Nhiệt độ sao', 3000, 8000, 5500, 100)
+        st_logg = st.slider('📊 log(g)', 3.0, 5.5, 4.2, 0.01)
+    if st.button("🔮 Dự đoán"):
+        inp = np.array([[orbper, radj, bmasse, orbincl, st_teff, st_logg]])
+        inp_scaled = scaler.transform(inp)
+        proba = model.predict_proba(inp_scaled)[0][1]
         if proba > 0.5:
-            st.success(f"✅ **CÓ HÀNH TINH!** Độ tin cậy: {proba*100:.2f}%")
+            st.success(f"✅ CÓ HÀNH TINH! Độ tin cậy: {proba*100:.2f}%")
             st.balloons()
         else:
-            st.warning(f"❌ **KHÔNG CÓ HÀNH TINH.** Độ tin cậy: {proba*100:.2f}%")
+            st.warning(f"❌ KHÔNG CÓ HÀNH TINH. Độ tin cậy: {proba*100:.2f}%")
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=proba*100,
             title={'text': "Độ tin cậy (%)", 'font': {'color': '#a8b2d1'}},
-            domain={'x': [0, 1], 'y': [0, 1]},
+            domain={'x': [0,1], 'y': [0,1]},
             gauge={
-                'axis': {'range': [0, 100], 'tickcolor': '#a8b2d1'},
+                'axis': {'range': [0,100], 'tickcolor': '#a8b2d1'},
                 'bar': {'color': '#7b2ffc' if proba>0.5 else '#ff6fd8'},
-                'steps': [
-                    {'range': [0, 50], 'color': 'rgba(255,100,100,0.15)'},
-                    {'range': [50, 100], 'color': 'rgba(0,212,255,0.15)'}
-                ],
-                'threshold': {
-                    'line': {'color': '#64ffda', 'width': 4},
-                    'thickness': 0.75,
-                    'value': proba*100
-                }
+                'steps': [{'range': [0,50], 'color': 'rgba(255,100,100,0.15)'}, {'range': [50,100], 'color': 'rgba(0,212,255,0.15)'}],
+                'threshold': {'line': {'color': '#64ffda', 'width': 4}, 'thickness': 0.75, 'value': proba*100}
             }
         ))
-        fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font_color='#a8b2d1',
-            height=300,
-            margin=dict(l=30, r=30, t=30, b=30)
-        )
+        fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#a8b2d1', height=300, margin=dict(l=30,r=30,t=30,b=30))
         st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── Tab 5: Thống kê ────────────────────────────────────────────
 with tab5:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="icon">📊</span> Thống kê tổng quan</div>', unsafe_allow_html=True)
-    if len(st.session_state.history) > 0:
-        hist_df = pd.DataFrame(st.session_state.history)
-        st.dataframe(hist_df, use_container_width=True)
-        fig = px.line(hist_df, x='time', y='n_planets', title='Số hành tinh phát hiện theo thời gian',
-                      labels={'time': 'Thời gian', 'n_planets': 'Số hành tinh'})
+    st.markdown('<div class="card-title"><span class="icon">📊</span> Thống kê</div>', unsafe_allow_html=True)
+    if st.session_state.history:
+        dfh = pd.DataFrame(st.session_state.history)
+        st.dataframe(dfh)
+        fig = px.line(dfh, x='time', y='n_planets', title='Số hành tinh theo thời gian')
         fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#a8b2d1')
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("📭 Chưa có lịch sử phân tích. Hãy bắt đầu dự đoán!")
+        st.info("Chưa có lịch sử.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── Tab 6: Bảng xếp hạng ──────────────────────────────────────
 with tab6:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title"><span class="icon">🏆</span> Bảng xếp hạng</div>', unsafe_allow_html=True)
-    rankings = st.session_state.rankings
-    if rankings:
-        sorted_rank = sorted(rankings.items(), key=lambda x: x[1], reverse=True)
-        rank_df = pd.DataFrame(sorted_rank, columns=['Người dùng', 'Điểm'])
-        rank_df.index = rank_df.index + 1
-        rank_df.index.name = 'Hạng'
+    if st.session_state.rankings:
+        sorted_rank = sorted(st.session_state.rankings.items(), key=lambda x: x[1], reverse=True)
+        dfr = pd.DataFrame(sorted_rank, columns=['Người dùng', 'Điểm'])
+        dfr.index = dfr.index + 1
+        dfr.index.name = 'Hạng'
         if st.session_state.logged_in:
-            current = st.session_state.username
-            rank_df[''] = rank_df['Người dùng'].apply(lambda x: '⭐' if x == current else '')
-        st.dataframe(rank_df, use_container_width=True)
-        top10 = sorted_rank[:10]
-        if top10:
-            fig = px.bar(x=[u[0] for u in top10], y=[u[1] for u in top10],
-                         title="Top 10 Thợ săn hành tinh",
-                         labels={'x': 'Người dùng', 'y': 'Điểm'})
-            fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                              font_color='#a8b2d1', showlegend=False, height=350)
+            dfr[''] = dfr['Người dùng'].apply(lambda x: '⭐' if x == st.session_state.username else '')
+        st.dataframe(dfr)
+        if len(sorted_rank) > 1:
+            top = sorted_rank[:10]
+            fig = px.bar(x=[u[0] for u in top], y=[u[1] for u in top], title='Top 10')
+            fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#a8b2d1', showlegend=False, height=350)
             st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("📭 Chưa có người dùng. Hãy đăng nhập và săn hành tinh!")
+        st.info("Chưa có người dùng.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── Footer ──────────────────────────────────────────────────────
 st.markdown("""
 <div class="footer">
-    🚀 AstroMine-X Pro · v3.2 · Phát triển với ❤️ và Linh Bảo 🐼<br>
+    🚀 AstroMine-X Pro · v3.3 · Phát triển với ❤️ và Linh Bảo 🐼<br>
     Dữ liệu từ NASA Exoplanet Archive · © 2026
 </div>
 """, unsafe_allow_html=True)
