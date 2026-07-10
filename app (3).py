@@ -222,54 +222,60 @@ def show_linhbao():
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
             background: transparent;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            overflow: hidden;
+            width: 100vw;
             height: 100vh;
             font-family: 'Inter', sans-serif;
             pointer-events: none;
         }}
         .wrapper {{
+            position: fixed;
+            top: 50px;
+            left: 50px;
             pointer-events: auto;
             cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: all 0.1s linear;
             user-select: none;
+            z-index: 99999;
         }}
-        .wrapper:hover {{ transform: scale(1.05); }}
+        .wrapper:hover {{
+            transform: scale(1.05);
+        }}
         .bubble {{
             background: rgba(20,30,50,0.85);
             backdrop-filter: blur(12px);
             color: #e6f1ff;
-            padding: 10px 16px;
+            padding: 8px 14px;
             border-radius: 20px 20px 20px 4px;
-            font-size: 0.8rem;
-            max-width: 160px;
+            font-size: 0.75rem;
+            max-width: 150px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.6);
             border: 1px solid rgba(0,212,255,0.15);
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-align: center;
-            line-height: 1.4;
+            line-height: 1.3;
             transition: all 0.3s;
+            white-space: nowrap;
         }}
         .avatar {{
-            width: 68px;
-            height: 68px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             background: linear-gradient(135deg, #00d4ff, #7b2ffc);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.6rem;
+            font-size: 2.2rem;
             box-shadow: 0 8px 32px rgba(0,212,255,0.3);
             animation: float 4s ease-in-out infinite;
             border: 2px solid rgba(255,255,255,0.1);
         }}
         @keyframes float {{
             0%, 100% {{ transform: translateY(0); }}
-            50% {{ transform: translateY(-10px); }}
+            50% {{ transform: translateY(-8px); }}
         }}
         .speaking .avatar {{
             animation: speak 0.5s ease 3;
@@ -278,60 +284,139 @@ def show_linhbao():
             0%, 100% {{ transform: scale(1); }}
             50% {{ transform: scale(1.15) rotate(-4deg); }}
         }}
+        .bouncing {{
+            animation: bounce 0.3s ease;
+        }}
+        @keyframes bounce {{
+            0% {{ transform: scale(1); }}
+            30% {{ transform: scale(1.3) rotate(10deg); }}
+            60% {{ transform: scale(0.9) rotate(-5deg); }}
+            100% {{ transform: scale(1); }}
+        }}
     </style>
     </head>
     <body>
-    <div class="wrapper" onclick="say()">
+    <div class="wrapper" id="wrapper" onclick="say()">
         <div class="bubble" id="bubble">🐼 Click vào em!</div>
         <div class="avatar" id="avatar">🐼</div>
     </div>
     <script>
         const sayings = {sayings_json};
+        const wrapper = document.getElementById('wrapper');
         const bubble = document.getElementById('bubble');
         const avatar = document.getElementById('avatar');
-        const wrapper = document.querySelector('.wrapper');
 
-        function say() {{
+        let vx = 1.2;
+        let vy = 0.8;
+        let x = 50;
+        let y = 50;
+        let lastBubbleText = '';
+
+        function move() {{
+            const w = window.innerWidth - 120;
+            const h = window.innerHeight - 160;
+
+            x += vx;
+            y += vy;
+
+            if (x > w) {{ x = w; vx = -vx; bounceEffect(); sayRandom(); }}
+            if (x < 0) {{ x = 0; vx = -vx; bounceEffect(); sayRandom(); }}
+            if (y > h) {{ y = h; vy = -vy; bounceEffect(); sayRandom(); }}
+            if (y < 0) {{ y = 0; vy = -vy; bounceEffect(); sayRandom(); }}
+
+            wrapper.style.left = x + 'px';
+            wrapper.style.top = y + 'px';
+
+            if (Math.random() < 0.005) {{
+                vx += (Math.random() - 0.5) * 0.8;
+                vy += (Math.random() - 0.5) * 0.8;
+                const maxSpeed = 2.5;
+                const sp = Math.sqrt(vx*vx + vy*vy);
+                if (sp > maxSpeed) {{
+                    vx = (vx/sp) * maxSpeed;
+                    vy = (vy/sp) * maxSpeed;
+                }}
+                if (sp < 0.6) {{
+                    vx = (vx/sp) * 0.8 || 1.2;
+                    vy = (vy/sp) * 0.8 || 0.8;
+                }}
+            }}
+        }}
+
+        function bounceEffect() {{
+            avatar.classList.add('bouncing');
+            setTimeout(() => avatar.classList.remove('bouncing'), 400);
+        }}
+
+        function sayRandom() {{
             const idx = Math.floor(Math.random() * sayings.length);
-            bubble.textContent = sayings[idx];
+            const msg = sayings[idx];
+            if (msg !== lastBubbleText) {{
+                bubble.textContent = msg;
+                lastBubbleText = msg;
+            }}
             avatar.classList.remove('speaking');
             void avatar.offsetWidth;
             avatar.classList.add('speaking');
         }}
 
+        function say() {{
+            const idx = Math.floor(Math.random() * sayings.length);
+            const msg = sayings[idx];
+            bubble.textContent = msg;
+            lastBubbleText = msg;
+            avatar.classList.remove('speaking');
+            void avatar.offsetWidth;
+            avatar.classList.add('speaking');
+            vx = (Math.random() - 0.5) * 4;
+            vy = (Math.random() - 0.5) * 4;
+        }}
+
         setTimeout(() => {{
-            bubble.textContent = 'Tiểu thư, em đây! 🌟';
-        }}, 2000);
+            bubble.textContent = 'Tiểu thư, em đang bay đây! 🌟';
+            lastBubbleText = 'Tiểu thư, em đang bay đây! 🌟';
+        }}, 1500);
+
+        setInterval(move, 30);
 
         wrapper.addEventListener('mouseenter', () => {{
             if (!bubble.textContent.includes('Click')) {{
-                bubble.textContent = '👆 Click để nói chuyện!';
+                const old = bubble.textContent;
+                bubble.textContent = '👆 Click để trò chuyện!';
                 setTimeout(() => {{
-                    if (bubble.textContent === '👆 Click để nói chuyện!') {{
+                    if (bubble.textContent === '👆 Click để trò chuyện!') {{
                         bubble.textContent = sayings[Math.floor(Math.random() * sayings.length)];
                     }}
-                }}, 1500);
+                }}, 1200);
             }}
         }});
+
+        avatar.addEventListener('click', (e) => {{
+            e.stopPropagation();
+            say();
+        }});
+
+        console.log('🐼 Linh Bảo đã sẵn sàng bay nhảy!');
     </script>
     </body>
     </html>
     """
-    st.components.v1.html(html, height=220, scrolling=False)
+    st.components.v1.html(html, height=0, scrolling=False)
 
-# ─── Load model ──────────────────────────────────────────────────
+# ─── Load model (đã sửa lỗi đường dẫn) ─────────────────────────
 @st.cache_resource
 def load_model():
     try:
-        model = joblib.load("planet_model_lgb_fixed.pkl")
-        scaler = joblib.load("scaler_lgb_fixed.pkl")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model = joblib.load(os.path.join(base_dir, "planet_model_lgb_fixed.pkl"))
+        scaler = joblib.load(os.path.join(base_dir, "scaler_lgb_fixed.pkl"))
         return model, scaler
-    except:
+    except Exception as e:
+        st.error(f"❌ Lỗi load model: {e}")
         return None, None
 
 model, scaler = load_model()
 if model is None:
-    st.error("❌ Không tìm thấy model. Vui lòng đảm bảo có file 'planet_model_lgb_fixed.pkl' và 'scaler_lgb_fixed.pkl'.")
     st.stop()
 
 # ─── Hàm lưu / tải bảng xếp hạng ──────────────────────────────
@@ -348,7 +433,6 @@ def save_rankings(rankings):
         json.dump(rankings, f, indent=2, ensure_ascii=False)
 
 # ─── KHỞI TẠO SESSION_STATE AN TOÀN ─────────────────────────────
-# Sử dụng get để tránh lỗi AttributeError nếu chưa có key
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
@@ -419,7 +503,6 @@ st.markdown('<div class="sub-header">✨ Khám phá ngoại hành tinh với AI 
 # ─── Hàm phân tích chung ──────────────────────────────────────
 def analyze_data(df, show_chart=True, update_score=True):
     feature_cols = ['pl_orbper', 'pl_radj', 'pl_bmasse', 'pl_orbincl', 'st_teff', 'st_logg']
-    # Nếu có cột khác tương ứng
     rename_map = {}
     for col in df.columns:
         if col.lower() in ['pl_bmassj', 'pl_bmass'] and 'pl_bmasse' not in df.columns:
@@ -472,7 +555,6 @@ def analyze_data(df, show_chart=True, update_score=True):
         else:
             st.info(f"📌 Điểm hiện tại: {current_score} – lần này tìm được {n_planets} hành tinh.")
     
-    # Lưu lịch sử (an toàn)
     history = st.session_state.history
     history.append({
         'time': datetime.now().strftime("%H:%M:%S"),
@@ -533,7 +615,7 @@ with tab2:
             analyze_data(df)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── Tab 3: NASA (đã sửa lỗi) ──────────────────────────────────
+# ─── Tab 3: NASA ──────────────────────────────────────────────────
 with tab3:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title"><span class="icon">🌐</span> Tải dữ liệu từ NASA</div>', unsafe_allow_html=True)
@@ -608,7 +690,6 @@ with tab4:
             st.balloons()
         else:
             st.warning(f"❌ **KHÔNG CÓ HÀNH TINH.** Độ tin cậy: {proba*100:.2f}%")
-        # Đồng hồ đo
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=proba*100,
